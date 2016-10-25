@@ -688,3 +688,86 @@ class CoordinateTranslator(object):
             raise Exception("index %d is outside the valid range." %
                             index)
         return index % self.x_image_dim, index // self.x_image_dim
+
+
+class RandomChannelSwitchboardException(mdp.NodeException):
+    """Exception for routing problems in the Switchboard class."""
+    pass
+
+
+class RandomChannelSwitchboard(ChannelSwitchboard):
+    """
+    Randomly assigned 2D Switchboard.
+        Generates input-output connections for hierarchical networks with randomly assigned     receptive fields.
+        This switchboard can have variable number of input channel dimensions. This is useful when
+        used with SFA/PCA nodes with variable number of output dimensions.
+    """
+    def __init__(self, in_channels_xy, field_channels_xy, field_dstr='uniform', in_channel_dim=1, out_channels=1):
+
+        """Calculate the connections.
+
+        Keyword arguments:
+        in_channels_xy -- 2-Tuple with number of input channels in the x- and
+            y-direction (or a single number for both). This has to be
+            specified, since the actual input is only one 1d array.
+        field_channels_xy -- 2-Tuple with number of channels in each field in
+            the x- and y-direction (or a single number for both).
+        field_dstr -- Distribution for random sampling of fields. (default: uniform)
+        in_channel_dim -- Number of connections per input channel.
+        out_channels -- Number of output channels (default: 1)
+        """
+        in_channels_xy = to_2tuple(in_channels_xy)
+        field_channels_xy = to_2tuple(field_channels_xy)
+        self.field_dstr = field_dstr
+        self.in_channels_xy = in_channels_xy
+        self.field_channels_xy = field_channels_xy
+        self.out_channels = out_channels
+
+        out_channel_dim = (in_channel_dim * field_channels_xy[0] * field_channels_xy[1])
+        ## check parameters for inconsistencies
+        for i, name in enumerate(["x", "y"]):
+            if (field_channels_xy[i] > in_channels_xy[i]):
+                err = ("Number of field channels exceeds the number of "
+                       "input channels in %s-direction. "
+                       "This would lead to an empty connection list." %
+                       name)
+                raise RandomChannelSwitchboardException(err)
+
+        in_trans = CoordinateTranslator(*in_channels_xy)
+
+        if self.field_dstr == 'uniform':
+            x_fields_origin = numx.random.randint(0,self.in_channels_xy[0]-self.field_channels_xy[0]+1,self.out_channels)
+            y_fields_origin = numx.random.randint(0,self.in_channels_xy[1]-self.field_channels_xy[1]+1,self.out_channels)
+            self.fields_origin_xy = zip(x_fields_origin, y_fields_origin)
+        else:
+            err = ('Unknown field distribution.')
+            raise RandomChannelSwitchboardException(err)
+
+
+        # input-output mapping of connections
+        # connections has an entry for each output connection,
+        # containing the index of the input connection.
+        connections = numx.zeros([out_channels * out_channel_dim],
+                                 dtype=numx.int32)
+        first_out_con = 0
+        for i in xrange(self.out_channels):
+            # inner loop over field
+            x_start_chan = x_fields_origin[i]
+            y_start_chan = y_fields_origin[i]
+            for y_in_chan in range(y_start_chan,
+                                   y_start_chan + field_channels_xy[1]):
+                for x_in_chan in range(x_start_chan,
+                                    x_start_chan + field_channels_xy[0]):
+                    first_in_con = (in_trans.image_to_index(
+                                                x_in_chan, y_in_chan) *
+                                    in_channel_dim)
+                    connections[first_out_con:
+                                first_out_con + in_channel_dim] = \
+                        range(first_in_con, first_in_con + in_channel_dim)
+                    first_out_con += in_channel_dim
+        super(RandomChannelSwitchboard, self).__init__(
+                                input_dim=(in_channel_dim *
+                                    in_channels_xy[0] * in_channels_xy[1]),
+                                connections=connections,
+                                out_channel_dim=out_channel_dim,
+                                in_channel_dim=in_channel_dim)
