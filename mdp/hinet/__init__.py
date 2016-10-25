@@ -27,14 +27,15 @@ It maps the data according to rectangular overlapping 2d input areas. One can
 then feed the output into a Layer and each Node will get the correct input.
 """
 
-from .flownode import FlowNode
+from .flownode import FlowNode, IFlowNode
 from .layer import Layer, SameInputLayer, CloneLayer
 from .switchboard import (
     Switchboard, SwitchboardException, MeanInverseSwitchboard,
     ChannelSwitchboard,
     Rectangular2dSwitchboard, Rectangular2dSwitchboardException,
     DoubleRect2dSwitchboard, DoubleRect2dSwitchboardException,
-    DoubleRhomb2dSwitchboard, DoubleRhomb2dSwitchboardException
+    DoubleRhomb2dSwitchboard, DoubleRhomb2dSwitchboardException,
+    RandomChannelSwitchboard, RandomChannelSwitchboardException
 )
 from .htmlvisitor import (
     HiNetHTMLVisitor, HiNetXHTMLVisitor, NewlineWriteFile, show_flow
@@ -45,11 +46,12 @@ from .switchboard_factory import (
     FactoryDoubleRhomb2dSwitchboard
 )
 
-__all__ = ['FlowNode', 'Layer', 'SameInputLayer', 'CloneLayer',
+__all__ = ['FlowNode', 'IFlowNode', 'Layer', 'SameInputLayer', 'CloneLayer',
            'Switchboard', 'SwitchboardException', 'ChannelSwitchboard',
            'Rectangular2dSwitchboard', 'Rectangular2dSwitchboardException',
            'DoubleRect2dSwitchboard', 'DoubleRect2dSwitchboardException',
            'DoubleRhomb2dSwitchboard', 'DoubleRhomb2dSwitchboardException',
+           'RandomChannelSwitchboard', 'RandomChannelSwitchboardException',
            'HiNetHTMLVisitor', 'HiNetXHTMLVisitor', 'NewlineWriteFile',
            'show_flow', 'get_2d_image_switchboard'
            ]
