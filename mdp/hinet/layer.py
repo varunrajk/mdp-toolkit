@@ -227,6 +227,36 @@ class Layer(mdp.Node):
         return self.nodes.__iter__()
 
 
+# class CloneLayer(Layer):
+#     """Layer with a single node instance that is used multiple times.
+#
+#     The same single node instance is used to build the layer, so
+#     Clonelayer(node, 3) executes in the same way as Layer([node]*3).
+#     But Layer([node]*3) would have a problem when closing a training phase,
+#     so one has to use CloneLayer.
+#
+#     A CloneLayer can be used for weight sharing in the training phase. It might
+#     be also useful for reducing the memory footprint use during the execution
+#     phase (since only a single node instance is needed).
+#     """
+#
+#     def __init__(self, node, n_nodes=1, dtype=None):
+#         """Setup the layer with the given list of nodes.
+#
+#         Keyword arguments:
+#         node -- Node to be cloned.
+#         n_nodes -- Number of repetitions/clones of the given node.
+#         """
+#         super(CloneLayer, self).__init__((node,) * n_nodes, dtype=dtype)
+#         self.node = node  # attribute for convenience
+#
+#     def _stop_training(self, *args, **kwargs):
+#         """Stop training of the internal node."""
+#         if self.node.is_training():
+#             self.node.stop_training(*args, **kwargs)
+#         if self.output_dim is None:
+#             self.output_dim = self._get_output_dim_from_nodes()
+
 class CloneLayer(Layer):
     """Layer with a single node instance that is used multiple times.
 
@@ -256,6 +286,19 @@ class CloneLayer(Layer):
             self.node.stop_training(*args, **kwargs)
         if self.output_dim is None:
             self.output_dim = self._get_output_dim_from_nodes()
+
+    def _execute(self, x, *args, **kwargs):
+        n_samples = x.shape[0]
+        x = x.reshape(n_samples * x.shape[1] / self.node.input_dim, self.node.input_dim)
+        y = self.node.execute(x)
+        return y.reshape(n_samples, self.output_dim)
+
+
+    def _inverse(self, x, *args, **kwargs):
+        n_samples = x.shape[0]
+        x = x.reshape(n_samples * x.shape[1] / self.node.output_dim, self.node.output_dim)
+        y = self.node.inverse(x)
+        return y.reshape(n_samples, self.input_dim)
 
 class SameInputLayer(Layer):
     """SameInputLayer is a layer were all nodes receive the full input.
