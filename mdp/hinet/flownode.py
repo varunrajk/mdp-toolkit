@@ -220,15 +220,3 @@ class FlowNode(mdp.Node):
     def __iter__(self):
         return self._flow.__iter__()
 
-
-class IFlowNode(FlowNode, mdp.INode):
-    """IFlowNode wraps an IFlow of Nodes into a single INode.
-
-    This is handy if you want to use a iflow where a INode is required.
-    Additional args and kwargs for train and execute are supported.
-
-    All the read-only container slots are supported and are forwarded to the
-    internal flow.
-    """
-    def __init__(self, flow, input_dim=None, output_dim=None, dtype=None):
-        super(IFlowNode, self).__init__(flow=flow, input_dim=input_dim, output_dim=output_dim, dtype=dtype)

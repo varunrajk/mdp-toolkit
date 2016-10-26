@@ -140,10 +140,10 @@ from .signal_node import (NodeException, InconsistentDimException,
 from .linear_flows import CrashRecoveryException, FlowException, FlowExceptionCR
 
 # import base nodes and flow classes
-from .signal_node import (NodeMetaclass, Node, INode, PreserveDimNode,
+from .signal_node import (NodeMetaclass, Node, PreserveDimNode,
                          Cumulator, VariadicCumulator)
 
-from .linear_flows import (Flow, IFlow, CheckpointFlow,
+from .linear_flows import (Flow, CheckpointFlow,
                           CheckpointFunction, CheckpointSaveFunction)
 
 # import helper functions:
@@ -166,6 +166,7 @@ from .classifier_node import (ClassifierNode, ClassifierCumulator)
 from . import nodes
 from . import hinet
 from . import parallel
+from . import online
 from .test import test
 
 # explicitly set __all__, mainly needed for epydoc
@@ -180,7 +181,6 @@ __all__ = ['config',
            'ExtensionNode',
            'ExtensionNodeMetaclass',
            'Flow',
-           'IFlow',
            'FlowException',
            'FlowExceptionCR',
            'IsNotInvertibleException',
@@ -188,7 +188,6 @@ __all__ = ['config',
            'MDPException',
            'MDPWarning',
            'Node',
-           'INode',
            'NodeException',
            'TrainingException',
            'TrainingFinishedException',
@@ -206,6 +205,7 @@ __all__ = ['config',
            'hinet',
            'nodes',
            'parallel',
+           'online',
            'pca',
            'fastica',
            'utils',
