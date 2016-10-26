@@ -28,7 +28,7 @@ then feed the output into a Layer and each Node will get the correct input.
 """
 
 from .flownode import FlowNode, IFlowNode
-from .layer import Layer, SameInputLayer, CloneLayer
+from .layer import Layer, SameInputLayer, CloneLayer, ILayer, SameInputILayer, CloneILayer
 from .switchboard import (
     Switchboard, SwitchboardException, MeanInverseSwitchboard,
     ChannelSwitchboard,
@@ -47,6 +47,7 @@ from .switchboard_factory import (
 )
 
 __all__ = ['FlowNode', 'IFlowNode', 'Layer', 'SameInputLayer', 'CloneLayer',
+           'ILayer', 'SameInputILayer', 'CloneILayer',
            'Switchboard', 'SwitchboardException', 'ChannelSwitchboard',
            'Rectangular2dSwitchboard', 'Rectangular2dSwitchboardException',
            'DoubleRect2dSwitchboard', 'DoubleRect2dSwitchboardException',

@@ -140,10 +140,10 @@ from .signal_node import (NodeException, InconsistentDimException,
 from .linear_flows import CrashRecoveryException, FlowException, FlowExceptionCR
 
 # import base nodes and flow classes
-from .signal_node import (NodeMetaclass, Node, PreserveDimNode,
+from .signal_node import (NodeMetaclass, Node, INode, PreserveDimNode,
                          Cumulator, VariadicCumulator)
 
-from .linear_flows import (Flow, CheckpointFlow,
+from .linear_flows import (Flow, IFlow, CheckpointFlow,
                           CheckpointFunction, CheckpointSaveFunction)
 
 # import helper functions:
@@ -180,6 +180,7 @@ __all__ = ['config',
            'ExtensionNode',
            'ExtensionNodeMetaclass',
            'Flow',
+           'IFlow',
            'FlowException',
            'FlowExceptionCR',
            'IsNotInvertibleException',
@@ -187,6 +188,7 @@ __all__ = ['config',
            'MDPException',
            'MDPWarning',
            'Node',
+           'INode',
            'NodeException',
            'TrainingException',
            'TrainingFinishedException',
