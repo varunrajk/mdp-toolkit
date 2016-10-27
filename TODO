@@ -2,6 +2,21 @@ What follows is an old TODO. Nothing of what you read here is going to ever be i
 unless some new developer shows up. We keep the TODO here just for historical reasons and
 for everlasting shame on us ;)
 
+for MDP++
+===========
+
+- Add cache in inode (Done)
+
+- Add CCIPCA, MCA (Done)
+
+- IncSFA Nodes
+
+- Add test functions for all the new nodes
+
+- Add HBSFANode
+
+
+
 for MDP 3.3
 ===========
 

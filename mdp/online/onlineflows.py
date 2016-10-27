@@ -29,7 +29,7 @@ class IFlow(mdp.Flow):
     def __init__(self, flow, crash_recovery=False, verbose=False):
         super(IFlow, self).__init__(flow, crash_recovery, verbose)
         self._check_iflow_compatibilitiy(flow)
-        self._cache = {'%s-%d' % (str(node), i): node.cache for i, node in enumerate(flow)}
+        self._cache = self._get_cache_from_flow(flow)
 
     @property
     def cache(self):
@@ -196,7 +196,13 @@ class IFlow(mdp.Flow):
         self._check_value_type_isnode(flow[-1])
 
     def _get_cache_from_flow(self, flow):
-        return {'%s-%d' % (str(node), i): node.cache for i, node in enumerate(flow)}
+        _cache = {}
+        for i, node in enumerate(flow):
+            if not hasattr(node, 'cache'):
+                _cache['%s-%d' % (str(node), i)] = {}
+            else:
+                _cache['%s-%d' % (str(node), i)] = node.cache
+        return _cache
 
     def __setitem__(self, key, value):
         if isinstance(key, slice):

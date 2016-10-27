@@ -31,13 +31,22 @@ class ILayer(mdp.hinet.Layer, INode):
         nodes -- List of the nodes to be used.
         """
         super(ILayer, self).__init__(nodes, dtype=dtype)
-        self._cache = {'%s-%d'%(str(node),i): node.cache for i,node in enumerate(nodes)}
+        self._cache = self._get_cache_from_nodes(nodes)
         # numx_rng will not be set through super call. Have to set it here:
         self._numx_rng = None
         self.set_numx_rng(numx_rng)
 
     def set_cache(self, c):
         raise mdp.NodeException("Can't set the read only cache attribute. ")
+
+    def _get_cache_from_nodes(self, nodes):
+        _cache = {}
+        for i, node in enumerate(nodes):
+            if not hasattr(node, 'cache'):
+                _cache['%s-%d' % (str(node), i)] = {}
+            else:
+                _cache['%s-%d' % (str(node), i)] = node.cache
+        return _cache
 
     def set_numx_rng(self, rng):
         super(ILayer, self).set_numx_rng(rng)
@@ -76,6 +85,7 @@ class CloneILayer(mdp.hinet.CloneLayer, ILayer):
         n_nodes -- Number of repetitions/clones of the given node.
         """
         super(CloneILayer, self).__init__(node=node, n_nodes=n_nodes, dtype=dtype)
+        self._cache = node.cache
         # numx_rng will not be set through super call. Have to set it here:
         self._numx_rng = None
         self.set_numx_rng(numx_rng)
@@ -98,7 +108,7 @@ class SameInputILayer(mdp.hinet.SameInputLayer, ILayer):
         nodes -- List of the nodes to be used.
         """
         super(SameInputILayer, self).__init__(nodes=nodes, dtype=dtype)
-        self._cache = {'%s-%d' % (str(node), i): node.cache for i, node in enumerate(nodes)}
+        self._cache = self._get_cache_from_nodes(nodes)
         # numx_rng will not be set through super call. Have to set it here:
         self._numx_rng = None
         self.set_numx_rng(numx_rng)
