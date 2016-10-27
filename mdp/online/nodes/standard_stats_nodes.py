@@ -1,10 +1,10 @@
 
 
 import mdp
-from mdp.online import INode
+from mdp.online import PreserveDimINode
 
 
-class SignalAvgNode(INode):
+class SignalAvgNode(PreserveDimINode):
     """Compute moving average on the input data.
      Also supports exponentially weighted moving average when
      the parameter avg_n is set.
@@ -16,7 +16,7 @@ class SignalAvgNode(INode):
       ``self.avg``
           The current average of the input data
     """
-    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None, **kwargs):
+    def __init__(self, input_dim=None, dtype=None, numx_rng=None, **kwargs):
         """
         :Additional Arguments:
 
@@ -26,11 +26,11 @@ class SignalAvgNode(INode):
                 represents about 86% of the total weight.
         """
 
-        super(SignalAvgNode, self).__init__(input_dim=input_dim, output_dim=output_dim, dtype=dtype, numx_rng=numx_rng)
+        super(SignalAvgNode, self).__init__(input_dim=input_dim, output_dim=None, dtype=dtype, numx_rng=numx_rng)
         self.kwargs = kwargs
         self.avg_n = kwargs.get('avg_n')
-        self._cache = {'avg':self.avg}
         self.avg = None
+        self._cache = {'avg': None}
 
     def _check_params(self, x):
         if self.avg is None:
@@ -56,6 +56,6 @@ class SignalAvgNode(INode):
         else:
             return (x + self.avg)
 
-    def get_current_average(self):
+    def get_average(self):
         return self.avg
 
