@@ -3,7 +3,7 @@ from builtins import str
 import mdp
 from mdp import numx
 from mdp.linear_flows import  FlowException, FlowExceptionCR, _sys, _traceback
-
+from mdp.online import INode
 
 class IFlow(mdp.Flow):
     """A 'Flow' is a sequence of nodes that are trained and executed
@@ -29,6 +29,10 @@ class IFlow(mdp.Flow):
     def __init__(self, flow, crash_recovery=False, verbose=False):
         super(IFlow, self).__init__(flow, crash_recovery, verbose)
         self._check_iflow_compatibilitiy(flow)
+        self._cache = {'%s-%d' % (str(node), i): node._cache for i, node in enumerate(flow)}
+
+    def get_cache(self):
+        return self._cache
 
     def _train_node(self, data_iterable, nodenr):
         err_str = ('Not used in IFlow')
@@ -169,7 +173,7 @@ class IFlow(mdp.Flow):
             print("Training nodes %s simultaneously" % (strn))
         self._train_nodes(data_iterable)
 
-        if not isinstance(self.flow[-1], mdp.INode):
+        if not isinstance(self.flow[-1], INode):
             self._close_last_node()
 
     ###### private container methods
@@ -178,7 +182,7 @@ class IFlow(mdp.Flow):
         # inodes and non-trainable nodes are iflow compatible
         if not isinstance(value, mdp.Node):
             raise TypeError("flow item must be a Node instance")
-        elif not isinstance(value, mdp.INode):
+        elif not isinstance(value, INode):
             # classic mdp Node
             if value.is_trainable():
                 raise TypeError("flow item must be either an INode instance or a non-trainable Node")
@@ -189,6 +193,9 @@ class IFlow(mdp.Flow):
     def _check_iflow_compatibilitiy(self, flow):
         [self._check_value_type_is_iflow_compat(item) for item in flow[:-1]]
         self._check_value_type_isnode(flow[-1])
+
+    def _get_cache_from_flow(self, flow):
+        return {'%s-%d' % (str(node), i): node._cache for i, node in enumerate(flow)}
 
     def __setitem__(self, key, value):
         if isinstance(key, slice):
@@ -204,6 +211,7 @@ class IFlow(mdp.Flow):
         [self._check_value_type_is_iflow_compat(item) for item in flow_copy[:-1]]
         # if no exception was raised, accept the new sequence
         self.flow = flow_copy
+        self._cache = self._get_cache_from_flow(flow_copy)
 
     def __delitem__(self, key):
         # make a copy of list
@@ -214,10 +222,11 @@ class IFlow(mdp.Flow):
         [self._check_value_type_is_iflow_compat(item) for item in flow_copy[:-1]]
         # if no exception was raised, accept the new sequence
         self.flow = flow_copy
+        self._cache = self._get_cache_from_flow(flow_copy)
 
     def __add__(self, other):
         # append other to self
-        if isinstance(other, Flow):
+        if isinstance(other, mdp.Flow):
             flow_copy = list(self.flow).__add__(other.flow)
             # check iflow compatibility
             self._check_iflow_compatibilitiy(flow_copy)
@@ -241,7 +250,7 @@ class IFlow(mdp.Flow):
 
     def __iadd__(self, other):
         # append other to self
-        if isinstance(other, Flow):
+        if isinstance(other, mdp.Flow):
             self.flow += other.flow
         elif isinstance(other, mdp.Node):
             self.flow.append(other)
@@ -251,6 +260,7 @@ class IFlow(mdp.Flow):
             raise TypeError(err_str)
         self._check_iflow_compatibilitiy(self.flow)
         self._check_nodes_consistency(self.flow)
+        self._cache = self._get_cache_from_flow(self.flow)
         return self
 
     ###### public container methods
@@ -259,18 +269,21 @@ class IFlow(mdp.Flow):
         """flow.append(node) -- append node to flow end"""
         self[len(self):len(self)] = [x]
         self._check_nodes_consistency(self.flow)
+        self._cache = self._get_cache_from_flow(self.flow)
 
     def extend(self, x):
         """flow.extend(iterable) -- extend flow by appending
         elements from the iterable"""
-        if not isinstance(x, Flow):
+        if not isinstance(x, mdp.Flow):
             err_str = ('can only concatenate flow'
                        ' (not \'%s\') to flow' % (type(x).__name__))
             raise TypeError(err_str)
         self[len(self):len(self)] = x
         self._check_nodes_consistency(self.flow)
+        self._cache = self._get_cache_from_flow(self.flow)
 
     def insert(self, i, x):
         """flow.insert(index, node) -- insert node before index"""
         self[i:i] = [x]
         self._check_nodes_consistency(self.flow)
+        self._cache = self._get_cache_from_flow(self.flow)

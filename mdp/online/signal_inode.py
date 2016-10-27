@@ -41,8 +41,14 @@ class INode(Node):
         super(INode, self).__init__(input_dim,output_dim,dtype)
         # this var stores the index of the current training iteration
         self._train_iteration = 0
+        # this cache var dict stores an interemediate result or paramenter values
+        # at the end of each train iteration. INode subclasses should
+        # initialize the required keys
+        self._cache = dict()
 
-    ### Node states
+    def get_cache(self):
+        return self._cache
+
     def get_current_train_iteration(self):
         """Return the index of the current training iteration."""
         return self._train_iteration

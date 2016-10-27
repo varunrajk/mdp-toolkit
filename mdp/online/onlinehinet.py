@@ -31,7 +31,10 @@ class ILayer(mdp.hinet.Layer, INode):
         nodes -- List of the nodes to be used.
         """
         super(ILayer, self).__init__(nodes, dtype=dtype)
+        self._cache = {'%s-%d'%(str(node),i): node._cache for i,node in enumerate(nodes)}
 
+    def train(self, x, *args, **kwargs):
+        super(ILayer, self).train(x, *args, **kwargs)
 
     def _get_train_seq(self):
         """Return the train sequence.
@@ -94,3 +97,6 @@ class IFlowNode(mdp.hinet.FlowNode, INode):
     """
     def __init__(self, flow, input_dim=None, output_dim=None, dtype=None):
         super(IFlowNode, self).__init__(flow=flow, input_dim=input_dim, output_dim=output_dim, dtype=dtype)
+        self._cache = self.flow._cache
+
+

@@ -10,7 +10,7 @@ class SignalAvgNode(INode):
 
     This is an online learnable node (INode)
 
-    **Internal variables of interest**
+    **Internal variables of interest (stored in cache)**
 
       ``self.avg``
           The current average of the input data
@@ -29,6 +29,7 @@ class SignalAvgNode(INode):
         self.kwargs = kwargs
         self.avg_n = kwargs.get('avg_n')
         self.avg = 0
+        self._cache = {'avg':self.avg}
 
     def _train(self, x):
         if (self.avg_n is None):
@@ -36,6 +37,7 @@ class SignalAvgNode(INode):
         else:
             alpha = 2.0/(self.avg_n+1)
         self.avg = (1-alpha) * self.avg + alpha*x
+        self._cache['avg']=self.avg
 
     def _execute(self, x):
         if self.get_current_train_iteration() == 1:
