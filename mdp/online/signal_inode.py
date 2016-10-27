@@ -29,15 +29,30 @@ class INode(Node):
         in a file, respectively. Additional methods may be present, depending
         on the algorithm.
 
+        INodes also supports using a pre-seeded random number generator (through
+        'numx_rng' parameter. This can be used to replicate results.
+
         `INode` subclasses should take care of overwriting (if necessary)
         the functions `_train`, `_stop_training`, `_execute`,
-        `is_invertible`, `_inverse`, and `_get_supported_dtypes`.
+        `is_invertible`, `_inverse`, '_init_params', and `_get_supported_dtypes`.
         If you need to overwrite the getters and setters of the
         node's properties refer to the docstring of `get_input_dim`/`set_input_dim`,
-        `get_output_dim`/`set_output_dim`, and `get_dtype`/`set_dtype`.
+        `get_output_dim`/`set_output_dim`, `get_dtype`/`set_dtype`, 'get_numx_rng'/'set_numx_rng'.
     """
 
-    def __init__(self, input_dim=None, output_dim=None, dtype=None):
+    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
+        """If the input dimension and the output dimension are
+        unspecified, they will be set when the `train` or `execute`
+        method is called for the first time.
+        If dtype is unspecified, it will be inherited from the data
+        it receives at the first call of `train` or `execute`.
+        If numx_rng is unspecified, it will be set a random number generator
+        with a random seed.
+
+        Every subclass must take care of up- or down-casting the internal
+        structures to match this argument (use `_refcast` private
+        method when possible).
+        """
         super(INode, self).__init__(input_dim,output_dim,dtype)
         # this var stores the index of the current training iteration
         self._train_iteration = 0
@@ -45,9 +60,40 @@ class INode(Node):
         # at the end of each train iteration. INode subclasses should
         # initialize the required keys
         self._cache = dict()
+        # this var stores random number generator
+        self._numx_rng = None
+        self.set_numx_rng(numx_rng)
+
+    def get_numx_rng(self):
+        """Return input dimensions."""
+        return self._numx_rng
+
+    def set_numx_rng(self, rng):
+        """Set numx random number generator.
+            Perform type checks
+        """
+        if rng is None:
+            pass
+        elif not isinstance(rng, mdp.numx_rand.mtrand.RandomState):
+                raise NodeException('numx_rng should be of type %s but given %s'
+                                    %(str(mdp.numx_rand.mtrand.RandomState), str(type(rng))))
+        else:
+            self._set_numx_rng(rng)
+
+    def _set_numx_rng(self, rng):
+        self._numx_rng = rng
+
+    numx_rng = property(get_numx_rng,
+                         set_numx_rng,
+                         doc="Numpy seeded random number generator")
 
     def get_cache(self):
         return self._cache
+
+    def set_cache(self, c):
+        self._cache = c
+
+    cache = property(get_cache, set_cache, doc="Internal cache dict")
 
     def get_current_train_iteration(self):
         """Return the index of the current training iteration."""
@@ -84,6 +130,19 @@ class INode(Node):
         # control the dimension of y
         self._check_output(y)
 
+    def _check_params(self, x):
+        # set in the subclass
+        pass
+
+    def _check_input(self, x):
+        super(INode, self)._check_input(x)
+
+        # set numx_rng if necessary
+        if self.numx_rng is None:
+            self.numx_rng = mdp.numx_rand.RandomState()
+
+
+
     def train(self, x, *args, **kwargs):
         """Update the internal structures according to the input data `x`.
 
@@ -108,6 +167,7 @@ class INode(Node):
             raise TrainingFinishedException(err_str)
 
         self._check_input(x)
+        self._check_params(x)
         self._check_train_args(x, *args, **kwargs)
 
         self._train_phase_started = True

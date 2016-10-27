@@ -21,7 +21,7 @@ class ILayer(mdp.hinet.Layer, INode):
     build a layered network). If one would like to use flows instead of nodes
     inside of a layer one can use a FlowNode.
     """
-    def __init__(self, nodes, dtype=None):
+    def __init__(self, nodes, dtype=None, numx_rng=None):
         """Setup the layer with the given list of nodes.
 
         The input and output dimensions for the nodes must be already set
@@ -31,7 +31,18 @@ class ILayer(mdp.hinet.Layer, INode):
         nodes -- List of the nodes to be used.
         """
         super(ILayer, self).__init__(nodes, dtype=dtype)
-        self._cache = {'%s-%d'%(str(node),i): node._cache for i,node in enumerate(nodes)}
+        self._cache = {'%s-%d'%(str(node),i): node.cache for i,node in enumerate(nodes)}
+        # numx_rng will not be set through super call. Have to set it here:
+        self._numx_rng = None
+        self.set_numx_rng(numx_rng)
+
+    def set_cache(self, c):
+        raise mdp.NodeException("Can't set the read only cache attribute. ")
+
+    def set_numx_rng(self, rng):
+        super(ILayer, self).set_numx_rng(rng)
+        # set the numx_rng for all the nodes to be the same.
+        [node.set_numx_rng(rng) for node in self.nodes]
 
     def train(self, x, *args, **kwargs):
         super(ILayer, self).train(x, *args, **kwargs)
@@ -57,7 +68,7 @@ class CloneILayer(mdp.hinet.CloneLayer, ILayer):
     phase (since only a single node instance is needed).
     """
 
-    def __init__(self, node, n_nodes=1, dtype=None):
+    def __init__(self, node, n_nodes=1, dtype=None, numx_rng=None):
         """Setup the layer with the given list of nodes.
 
         Keyword arguments:
@@ -65,6 +76,9 @@ class CloneILayer(mdp.hinet.CloneLayer, ILayer):
         n_nodes -- Number of repetitions/clones of the given node.
         """
         super(CloneILayer, self).__init__(node=node, n_nodes=n_nodes, dtype=dtype)
+        # numx_rng will not be set through super call. Have to set it here:
+        self._numx_rng = None
+        self.set_numx_rng(numx_rng)
 
 
 class SameInputILayer(mdp.hinet.SameInputLayer, ILayer):
@@ -74,7 +88,7 @@ class SameInputILayer(mdp.hinet.SameInputLayer, ILayer):
     receive the complete input data.
     """
 
-    def __init__(self, nodes, dtype=None):
+    def __init__(self, nodes, dtype=None, numx_rng=None):
         """Setup the layer with the given list of nodes.
 
         The input dimensions for the nodes must all be equal, the output
@@ -84,6 +98,10 @@ class SameInputILayer(mdp.hinet.SameInputLayer, ILayer):
         nodes -- List of the nodes to be used.
         """
         super(SameInputILayer, self).__init__(nodes=nodes, dtype=dtype)
+        self._cache = {'%s-%d' % (str(node), i): node.cache for i, node in enumerate(nodes)}
+        # numx_rng will not be set through super call. Have to set it here:
+        self._numx_rng = None
+        self.set_numx_rng(numx_rng)
 
 
 class IFlowNode(mdp.hinet.FlowNode, INode):
@@ -95,8 +113,17 @@ class IFlowNode(mdp.hinet.FlowNode, INode):
     All the read-only container slots are supported and are forwarded to the
     internal flow.
     """
-    def __init__(self, flow, input_dim=None, output_dim=None, dtype=None):
+    def __init__(self, flow, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
         super(IFlowNode, self).__init__(flow=flow, input_dim=input_dim, output_dim=output_dim, dtype=dtype)
-        self._cache = self.flow._cache
+        self._cache = flow.cache
+        # numx_rng will not be set through super call. Have to set it here:
+        self._numx_rng = None
+        self.set_numx_rng(numx_rng)
 
+    def set_cache(self, c):
+        raise mdp.NodeException("Can't set the read only cache attribute. ")
 
+    def set_numx_rng(self, rng):
+        super(IFlowNode, self).set_numx_rng(rng)
+        # set the numx_rng for all the nodes to be the same.
+        [node.set_numx_rng(rng) for node in self._flow.nodes]
