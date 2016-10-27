@@ -1,7 +1,8 @@
 
 
-
+import mdp
 from mdp.online import INode
+
 
 class SignalAvgNode(INode):
     """Compute moving average on the input data.
@@ -15,7 +16,7 @@ class SignalAvgNode(INode):
       ``self.avg``
           The current average of the input data
     """
-    def __init__(self, input_dim=None, output_dim=None, dtype=None, **kwargs):
+    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None, **kwargs):
         """
         :Additional Arguments:
 
@@ -25,11 +26,15 @@ class SignalAvgNode(INode):
                 represents about 86% of the total weight.
         """
 
-        super(SignalAvgNode, self).__init__(input_dim=input_dim, output_dim=output_dim, dtype=dtype)
+        super(SignalAvgNode, self).__init__(input_dim=input_dim, output_dim=output_dim, dtype=dtype, numx_rng=numx_rng)
         self.kwargs = kwargs
         self.avg_n = kwargs.get('avg_n')
-        self.avg = 0
         self._cache = {'avg':self.avg}
+        self.avg = None
+
+    def _check_params(self, x):
+        if self.avg is None:
+            self.avg = mdp.numx.zeros(x.shape[1])
 
     def _train(self, x):
         if (self.avg_n is None):
