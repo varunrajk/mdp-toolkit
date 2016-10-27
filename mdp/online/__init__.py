@@ -14,7 +14,7 @@ IFlow, IFlowNode and ILayer.
 
 """
 
-from .signal_inode import INode
+from .signal_inode import INode, PreserveDimINode
 
 from .onlinehinet import (
     IFlowNode, CloneILayer, SameInputILayer
@@ -25,11 +25,8 @@ from .onlineflows import IFlow
 import nodes
 
 __all__ = [
-        'INode',
-        'IFlowNode',
-        'IFlow',
-        'CloneILayer',
-        'SameInputILayer',
+        'INode', 'PreserveDimINode','IFlowNode',
+        'IFlow','CloneILayer','SameInputILayer',
         'nodes'
         ]
 

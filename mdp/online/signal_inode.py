@@ -215,3 +215,24 @@ class INode(Node):
             raise TypeError(err_str)
 
 
+class PreserveDimINode(INode):
+    """Abstract base class with ``output_dim == input_dim``.
+
+    If one dimension is set then the other is set to the same value.
+    If the dimensions are set to different values, then an
+    `InconsistentDimException` is raised.
+    """
+
+    def _set_input_dim(self, n):
+        if (self._output_dim is not None) and (self._output_dim != n):
+            err = "input_dim must be equal to output_dim for this node."
+            raise mdp.InconsistentDimException(err)
+        self._input_dim = n
+        self._output_dim = n
+
+    def _set_output_dim(self, n):
+        if (self._input_dim is not None) and (self._input_dim != n):
+            err = "output_dim must be equal to input_dim for this node."
+            raise mdp.InconsistentDimException(err)
+        self._input_dim = n
+        self._output_dim = n
