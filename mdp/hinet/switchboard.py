@@ -733,8 +733,33 @@ class RandomChannelSwitchboard(ChannelSwitchboard):
                        name)
                 raise RandomChannelSwitchboardException(err)
 
-        in_trans = CoordinateTranslator(*in_channels_xy)
+        self._lut_conn = numx.zeros([self.in_channels_xy[0]-self.field_channels_xy[0]+1,
+                                      self.in_channels_xy[1]-self.field_channels_xy[1]+1,
+                                      out_channel_dim], dtype=numx.int32)
 
+        x_fields_origin = range(self.in_channels_xy[0] - self.field_channels_xy[0] + 1)
+        y_fields_origin = range(self.in_channels_xy[1] - self.field_channels_xy[1] + 1)
+
+        tot_conns = self._lut_conn.shape[0]*self._lut_conn.shape[1]
+        origins = numx.asarray(numx.meshgrid(x_fields_origin, y_fields_origin)).reshape(2, tot_conns).T
+
+        for i in xrange(tot_conns):
+            x_start_chan, y_start_chan = origins[i]
+            xy_inchan = numx.asarray(numx.meshgrid(range(x_start_chan,x_start_chan + field_channels_xy[0]),
+                                                   range(y_start_chan,y_start_chan + field_channels_xy[1]))
+                                     ).reshape(2, numx.prod(field_channels_xy)).T
+            first_in_con = (xy_inchan[:,1]*in_channels_xy[0] + xy_inchan[:,0]) * in_channel_dim
+            self._lut_conn[x_start_chan, y_start_chan] = (numx.hstack([first_in_con]*in_channel_dim) + range(in_channel_dim)).ravel()
+
+        connections = self._new_connections()
+        super(RandomChannelSwitchboard, self).__init__(
+                                input_dim=(in_channel_dim *
+                                    in_channels_xy[0] * in_channels_xy[1]),
+                                connections=connections,
+                                out_channel_dim=out_channel_dim,
+                                in_channel_dim=in_channel_dim)
+
+    def _new_connections(self):
         if self.field_dstr == 'uniform':
             x_fields_origin = numx.random.randint(0,self.in_channels_xy[0]-self.field_channels_xy[0]+1,self.out_channels)
             y_fields_origin = numx.random.randint(0,self.in_channels_xy[1]-self.field_channels_xy[1]+1,self.out_channels)
@@ -742,32 +767,9 @@ class RandomChannelSwitchboard(ChannelSwitchboard):
         else:
             err = ('Unknown field distribution.')
             raise RandomChannelSwitchboardException(err)
+        return self._lut_conn[x_fields_origin, y_fields_origin].ravel()
 
+    def _execute(self, x):
+        self.connections = self._new_connections()
+        return x[:, self.connections]
 
-        # input-output mapping of connections
-        # connections has an entry for each output connection,
-        # containing the index of the input connection.
-        connections = numx.zeros([out_channels * out_channel_dim],
-                                 dtype=numx.int32)
-        first_out_con = 0
-        for i in xrange(self.out_channels):
-            # inner loop over field
-            x_start_chan = x_fields_origin[i]
-            y_start_chan = y_fields_origin[i]
-            for y_in_chan in range(y_start_chan,
-                                   y_start_chan + field_channels_xy[1]):
-                for x_in_chan in range(x_start_chan,
-                                    x_start_chan + field_channels_xy[0]):
-                    first_in_con = (in_trans.image_to_index(
-                                                x_in_chan, y_in_chan) *
-                                    in_channel_dim)
-                    connections[first_out_con:
-                                first_out_con + in_channel_dim] = \
-                        range(first_in_con, first_in_con + in_channel_dim)
-                    first_out_con += in_channel_dim
-        super(RandomChannelSwitchboard, self).__init__(
-                                input_dim=(in_channel_dim *
-                                    in_channels_xy[0] * in_channels_xy[1]),
-                                connections=connections,
-                                out_channel_dim=out_channel_dim,
-                                in_channel_dim=in_channel_dim)
