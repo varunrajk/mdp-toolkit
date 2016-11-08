@@ -694,15 +694,13 @@ class RandomChannelSwitchboardException(mdp.NodeException):
     """Exception for routing problems in the Switchboard class."""
     pass
 
-
 class RandomChannelSwitchboard(ChannelSwitchboard):
     """
-    Randomly assigned 2D Switchboard.
-        Generates input-output connections for hierarchical networks with randomly assigned     receptive fields.
-        This switchboard can have variable number of input channel dimensions. This is useful when
-        used with SFA/PCA nodes with variable number of output dimensions.
+    Randomly sampled 2D Switchboard.
+        Generates input-output connections for hierarchical networks with randomly sampled receptive fields.
+        New connections are set on every execute call
     """
-    def __init__(self, in_channels_xy, field_channels_xy, field_dstr='uniform', in_channel_dim=1, out_channels=1):
+    def __init__(self, in_channels_xy, field_channels_xy, in_channel_dim=1, out_channels=1, field_dstr='uniform'):
 
         """Calculate the connections.
 
@@ -733,6 +731,8 @@ class RandomChannelSwitchboard(ChannelSwitchboard):
                        name)
                 raise RandomChannelSwitchboardException(err)
 
+        in_trans = CoordinateTranslator(*in_channels_xy)
+
         self._lut_conn = numx.zeros([self.in_channels_xy[0]-self.field_channels_xy[0]+1,
                                       self.in_channels_xy[1]-self.field_channels_xy[1]+1,
                                       out_channel_dim], dtype=numx.int32)
@@ -744,12 +744,16 @@ class RandomChannelSwitchboard(ChannelSwitchboard):
         origins = numx.asarray(numx.meshgrid(x_fields_origin, y_fields_origin)).reshape(2, tot_conns).T
 
         for i in xrange(tot_conns):
+            # inner loop over field
             x_start_chan, y_start_chan = origins[i]
-            xy_inchan = numx.asarray(numx.meshgrid(range(x_start_chan,x_start_chan + field_channels_xy[0]),
-                                                   range(y_start_chan,y_start_chan + field_channels_xy[1]))
-                                     ).reshape(2, numx.prod(field_channels_xy)).T
-            first_in_con = (xy_inchan[:,1]*in_channels_xy[0] + xy_inchan[:,0]) * in_channel_dim
-            self._lut_conn[x_start_chan, y_start_chan] = (numx.hstack([first_in_con]*in_channel_dim) + range(in_channel_dim)).ravel()
+            connections = numx.zeros([out_channel_dim], dtype=numx.int32)
+            first_out_con = 0
+            for y_in_chan in range(y_start_chan,y_start_chan + field_channels_xy[1]):
+                for x_in_chan in range(x_start_chan,x_start_chan + field_channels_xy[0]):
+                    first_in_con = (in_trans.image_to_index(x_in_chan, y_in_chan) * in_channel_dim)
+                    connections[first_out_con: first_out_con + in_channel_dim] = range(first_in_con, first_in_con + in_channel_dim)
+                    first_out_con += in_channel_dim
+            self._lut_conn[x_start_chan, y_start_chan] = connections
 
         connections = self._new_connections()
         super(RandomChannelSwitchboard, self).__init__(
