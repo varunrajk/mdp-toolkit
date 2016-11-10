@@ -5,6 +5,7 @@ from .pca_nodes import WhiteningNode
 from .mca_nodes import MCANode
 from .standard_stats_nodes import MovingDiffNode
 from mdp.utils import mult
+import warnings as _warn
 
 class IncSFANode(INode):
     """
@@ -96,6 +97,10 @@ class IncSFANode(INode):
     @property
     def init_mca_vectors(self):
         return self.mcanode.init_eigen_vectors
+
+    def set_training_type(self, training_type):
+        if training_type != 'incremental':
+            _warn.warn("Cannot set training type to %s. Only 'incremental' is supported"%(training_type))
 
     def _check_params(self, x):
         if self._init_sf is None:

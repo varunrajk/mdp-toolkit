@@ -2,7 +2,7 @@ __docformat__ = "restructuredtext en"
 
 import mdp
 from mdp import NodeException, IsNotTrainableException
-from mdp import TrainingException, TrainingFinishedException,IsNotInvertibleException
+from mdp import TrainingException, TrainingFinishedException, IsNotInvertibleException
 from mdp import Node
 
 class INode(Node):
@@ -63,6 +63,11 @@ class INode(Node):
         # this var stores random number generator
         self._numx_rng = None
         self.set_numx_rng(numx_rng)
+        # this var stores training type ('incremental' (default), 'batch')
+        # incremental - data is passed through the _train_seq sample by sample
+        # batch - data is passed through the _train_seq in one shot (block-incremental training)
+        # this variable can be set using set_training_type() method.
+        self._training_type = 'incremental'
 
     def get_numx_rng(self):
         """Return input dimensions."""
@@ -98,6 +103,21 @@ class INode(Node):
     def get_current_train_iteration(self):
         """Return the index of the current training iteration."""
         return self._train_iteration
+
+    @property
+    def training_type(self):
+        """Training type (Read only)"""
+        return self._training_type
+
+    def set_training_type(self, training_type):
+        """Sets the training type ('incremental' or 'batch')
+            Overwrite this in the subclass to fix the training_type.
+        """
+
+        if (training_type == 'incremental') or (training_type == 'batch'):
+            self._training_type = training_type
+        else:
+            raise NodeException("Unknown training type specified %s. Supported types ['incremental', 'batch']"%(training_type))
 
     def _pre_execution_checks(self, x):
         """This method contains all pre-execution checks.
@@ -174,10 +194,16 @@ class INode(Node):
 
         x = self._refcast(x)
         self._train_phase_started = True
-        for i in xrange(x.shape[0]):
+
+        if self.training_type == 'incremental':
+            for i in xrange(x.shape[0]):
+                for _phase in xrange(len(self._train_seq)):
+                    self._train_seq[_phase][0](x[i:i+1], *args, **kwargs)
+                self._train_iteration += 1
+        else:
             for _phase in xrange(len(self._train_seq)):
-                self._train_seq[_phase][0](x[i:i+1], *args, **kwargs)
-            self._train_iteration += 1
+                self._train_seq[_phase][0](x, *args, **kwargs)
+            self._train_iteration += x.shape[0]
 
     def stop_training(self, *args, **kwargs):
         """Stop the training phase.

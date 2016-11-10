@@ -35,6 +35,7 @@ class ILayer(mdp.hinet.Layer, INode):
         # numx_rng will not be set through super call. Have to set it here:
         self._numx_rng = None
         self.set_numx_rng(numx_rng)
+        self._set_training_type_from_nodes(nodes)
 
     def set_cache(self, c):
         raise mdp.NodeException("Can't set the read only cache attribute. ")
@@ -47,6 +48,13 @@ class ILayer(mdp.hinet.Layer, INode):
             else:
                 _cache['%s-%d' % (str(node), i)] = node.cache
         return _cache
+
+    def _set_training_type_from_nodes(self, nodes):
+        for node in nodes:
+            if hasattr(node, 'training_type') and (node.training_type == 'incremental'):
+                self._training_type = 'incremental'
+                return
+        self._training_type = 'batch'
 
     def set_numx_rng(self, rng):
         super(ILayer, self).set_numx_rng(rng)
@@ -89,6 +97,7 @@ class CloneILayer(mdp.hinet.CloneLayer, ILayer):
         # numx_rng will not be set through super call. Have to set it here:
         self._numx_rng = None
         self.set_numx_rng(numx_rng)
+        self._set_training_type_from_nodes([node])
 
 
 class SameInputILayer(mdp.hinet.SameInputLayer, ILayer):
@@ -112,6 +121,7 @@ class SameInputILayer(mdp.hinet.SameInputLayer, ILayer):
         # numx_rng will not be set through super call. Have to set it here:
         self._numx_rng = None
         self.set_numx_rng(numx_rng)
+        self._set_training_type_from_nodes(nodes)
 
 
 class IFlowNode(mdp.hinet.FlowNode, INode):
@@ -129,9 +139,22 @@ class IFlowNode(mdp.hinet.FlowNode, INode):
         # numx_rng will not be set through super call. Have to set it here:
         self._numx_rng = None
         self.set_numx_rng(numx_rng)
+        self._set_training_type_from_flow(flow)
+
+    def _set_training_type_from_flow(self, flow):
+        for node in flow:
+            if hasattr(node, 'training_type') and (node.training_type == 'incremental'):
+                self._training_type = 'incremental'
+                return
+        self._training_type = 'batch'
+
+    def set_training_type(self, training_type):
+        if self.training_type != training_type:
+            raise mdp.NodeException("Cannot change the training type to %s. It is inferred from "
+                                    "the flow and is set to '%s'. "%(training_type, self.training_type))
 
     def set_cache(self, c):
-        raise mdp.NodeException("Can't set the read only cache attribute. ")
+        raise mdp.NodeException("Cannot set the read only cache attribute. ")
 
     def set_numx_rng(self, rng):
         super(IFlowNode, self).set_numx_rng(rng)
