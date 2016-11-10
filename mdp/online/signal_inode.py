@@ -106,9 +106,8 @@ class INode(Node):
         # control the dimension x
         self._check_input(x)
 
-        # set the output dimension if necessary
-        if self.output_dim is None:
-            self.output_dim = self.input_dim
+        # check/set params
+        self._check_params(x)
 
     def _pre_inversion_checks(self, y):
         """This method contains all pre-inversion checks.
@@ -137,10 +136,13 @@ class INode(Node):
     def _check_input(self, x):
         super(INode, self)._check_input(x)
 
+        # set the output dimension if necessary
+        if self.output_dim is None:
+            self.output_dim = self.input_dim
+
         # set numx_rng if necessary
         if self.numx_rng is None:
             self.numx_rng = mdp.numx_rand.RandomState()
-
 
 
     def train(self, x, *args, **kwargs):
@@ -170,12 +172,11 @@ class INode(Node):
         self._check_params(x)
         self._check_train_args(x, *args, **kwargs)
 
-        self._train_phase_started = True
-
+        x = self._refcast(x)
         self._train_phase_started = True
         for i in xrange(x.shape[0]):
             for _phase in xrange(len(self._train_seq)):
-                self._train_seq[_phase][0](self._refcast(x[i:i+1]), *args, **kwargs)
+                self._train_seq[_phase][0](x[i:i+1], *args, **kwargs)
             self._train_iteration += 1
 
     def stop_training(self, *args, **kwargs):

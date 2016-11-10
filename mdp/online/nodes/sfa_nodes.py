@@ -1,28 +1,10 @@
 
 import mdp
-from mdp.online import INode, IFlow
-from .pca_nodes import MCANode, WhiteningNode
+from mdp.online import INode
+from .pca_nodes import WhiteningNode
+from .mca_nodes import MCANode
+from .standard_stats_nodes import MovingDiffNode
 from mdp.utils import mult
-
-
-class TimeDiffNode(mdp.PreserveDimNode):
-    def __init__(self, input_dim=None, output_dim=None, dtype=None):
-        super(TimeDiffNode, self).__init__(input_dim, output_dim, dtype)
-        self.x_prev = None
-
-    def is_trainable(self):
-        return False
-
-    def _pre_execution_checks(self, x):
-        if self.x_prev is None:
-            self.x_prev = mdp.numx.zeros([1,x.shape[1]])
-
-    def _execute(self, x, include_last_sample=True):
-        if include_last_sample:
-            x = mdp.numx.vstack((self.x_prev,x))
-        self.x_prev = x[-1]
-        return x[1:] - x[:-1]
-
 
 class IncSFANode(INode):
     """
@@ -33,75 +15,64 @@ class IncSFANode(INode):
     Feature Analysis: Adaptive Low-Complexity Slow Feature Updating from
     High-Dimensional Input Streams, Neural Computation, 2012.
 
-    **kwargs**
-
-      ``eps``
-          Learning rate
-
-      ``whitening_output_dim`` (default: input_dim)
-          dimensionality reduction for the ccipca step 
-
-      ``amn_params`` (default: [20,200,2000,3])
-          Amnesic Parameters (for ccipca)
-
-      ``avg_n`` (default: None)
-          Exponentially weighted moving average coefficient
-
-      ``remove_mean`` (default: True)
-          Subtract signal average.
-
-      ``init_pca_vectors`` (default: randomly generated)
-          initial eigen vectors
-
-      ``init_mca_vectors`` (default: randomly generated)
-          initial eigen vectors
-
 
     **Instance variables of interest (stored in cache)**
 
-      ``slow_features`` (can also be accessed as self.v)
+      ``slow_features`` (can also be accessed as self.sf)
          Slow feature vectors
 
-      ``whitening_vectors`` (can also be accessed as self.wv)
+      ``whitening_vectors``
          Whitening vectors
 
       ``weight_change``
          Difference in slow features after update
 
     """
-    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None, **kwargs):
+    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None, eps=0.05,
+                 whitening_output_dim=None, remove_mean=True, avg_n=None, amn_params=(20,200,2000,3),
+                 init_pca_vectors=None, init_mca_vectors=None):
+        """
+        eps: Learning rate (default: 0.1)
+
+        whitening_output_dim: Whitening output dimension. (default: input_dim)
+
+        remove_mean: Remove input mean incrementally (default: True)
+
+        avg_n - When set, the node updates an exponential weighted moving average.
+                avg_n intuitively denotes a window size. For a large avg_n, avg_n samples
+                represents about 86% of the total weight. (Default:None)
+
+        amn_params: pca amnesic parameters. Default set to (n1=20,n2=200,m=2000,c=3).
+                            For n < n1, ~ moving average.
+                            For n1 < n < n2 - Transitions from moving average to amnesia. m denotes the scaling param and
+                            c typically should be between (2-4). Higher values will weigh recent data.
+
+        init_pca_vectors: initial whitening vectors. Default - randomly set
+
+        init_mca_vectors: initial mca vectors. Default - randomly set
+
+        """
+
         super(IncSFANode, self).__init__(input_dim, output_dim, dtype, numx_rng)
-        self.kwargs = kwargs
+        self.eps = eps
+        self.whitening_output_dim = whitening_output_dim
 
-        self.eps = self.kwargs.get('eps', 0.01)
-        self.whitening_output_dim = self.kwargs.get('whitening_output_dim', None)
-
-        self._init_wv = self.kwargs.get('init_pca_vectors', None)
         self.whiteningnode = WhiteningNode(input_dim=input_dim, output_dim=self.whitening_output_dim,
-                                           dtype=dtype, numx_rng=numx_rng, init_eigen_vectors=self._init_wv, **kwargs)
-
-        self.tdiffnode = TimeDiffNode()
-
-        self._init_mv = self.kwargs.get('init_mca_vectors', None)
+                                           dtype=dtype, numx_rng=numx_rng, init_eigen_vectors=init_pca_vectors,
+                                           amn_params=amn_params)
+        self.tdiffnode = MovingDiffNode(numx_rng=numx_rng)
         self.mcanode = MCANode(input_dim=self.whitening_output_dim, output_dim=output_dim,
-                               dtype=dtype, numx_rng=numx_rng, init_eigen_vectors=self._init_mv, **kwargs)
-        self.mcanode.gamme = 1.2*(0.2/self.eps)
+                               dtype=dtype, numx_rng=numx_rng, init_eigen_vectors=init_mca_vectors, eps=eps)
+
+        self.remove_mean = remove_mean
+        if remove_mean:
+            self.avgnode = mdp.online.nodes.SignalAvgNode(numx_rng=numx_rng, avg_n=avg_n)
 
         self._new_episode = True
-        # this flow is only trained when the new_episode flag is True.
-        # once trained the flag is set to false.
-        self._first_sample_train_flow = IFlow([self.whiteningnode, self.tdiffnode])
-        self._train_flow = IFlow([self.whiteningnode, self.tdiffnode, self.mcanode])
-        self._execute_flow = IFlow([self.whiteningnode, self.mcanode])
 
-        if self.kwargs.get('remove_mean', True):
-            self.avgnode = mdp.online.nodes.SignalAvgNode(avg_n=self.kwargs.get('avg_n', None))
-            self._train_flow.insert(0,self.avgnode)
-            self._execute_flow.insert(0,self.avgnode)
-
-        self._init_v = None
+        self._init_sf = None
         self.wv = None
-        self.v = None
+        self.sf = None
 
         # cache to store variables
         self._cache = {'slow_features': None, 'whitening_vectors': None, 'weight_change': None}
@@ -114,26 +85,66 @@ class IncSFANode(INode):
     def new_episode(self, flag):
         self._new_episode = flag
 
+    @property
+    def init_slow_features(self):
+        return self._init_sf
+
+    @property
+    def init_pca_vectors(self):
+        return self.whiteningnode.init_eigen_vectors
+
+    @property
+    def init_mca_vectors(self):
+        return self.mcanode.init_eigen_vectors
+
+    def _check_params(self, x):
+        if self._init_sf is None:
+            if self.remove_mean:
+                self._pseudo_check_fn(self.avgnode, x)
+            x = self.avgnode.execute(x)
+            self._pseudo_check_fn(self.whiteningnode, x)
+            x = self.whiteningnode.execute(x)
+            self._pseudo_check_fn(self.tdiffnode, x)
+            self._pseudo_check_fn(self.mcanode, x)
+            self._init_sf = mult(self.whiteningnode.init_eigen_vectors,self.mcanode.init_eigen_vectors)
+            self.sf = self._init_sf
+
+    def _pseudo_check_fn(self, node, x):
+        node._check_input(x)
+        node._check_params(x)
+
+    def _pseudo_train_fn(self, node, x):
+        node._train(x)
+        node._train_iteration+=x.shape[0]
+
     def _train(self, x):
+        if self.remove_mean:
+            self._pseudo_train_fn(self.avgnode, x)
+            x = self.avgnode._execute(x)
+
+        self._pseudo_train_fn(self.whiteningnode, x)
+        x = self.whiteningnode._execute(x)
+
+        self._pseudo_train_fn(self.tdiffnode, x)
+
         if self.new_episode:
-            self._first_sample_train_flow.train(x)
             self.new_episode = False
-        else:
-            self._train_flow.train(x)
+            return
 
-        self.wv = self.whiteningnode.v
+        x = self.tdiffnode._execute(x)
 
-        if self.v is None:
-            v_old = mult(self.mcanode.init_eigen_vectors, self.whiteningnode.init_eigen_vectors)
-        else:
-            v_old = self.v.copy()
-        self.v = mult(self.mcanode.v, self.wv)
+        self._pseudo_train_fn(self.mcanode, x)
 
-        self.cache['slow_features'] = self.v
-        self.cache['whitening_vectors'] = self.wv
-        self.cache['weight_change'] = [mdp.numx_linalg.norm(self.v - v_old)]
+        sf = mult(self.whiteningnode.v,self.mcanode.v)
+        sf_change = mdp.numx_linalg.norm(sf - self.sf)
+        self.sf = sf
+
+        self.cache['slow_features'] = self.sf.copy()
+        self.cache['whitening_vectors'] = self.whiteningnode.cache['eigen_vectors']
+        self.cache['weight_change'] = sf_change
 
     def _execute(self, x):
-        return self._execute_flow(x)
-
+        if self.remove_mean:
+            x = self.avgnode._execute(x)
+        return mult(x, self.sf)
 

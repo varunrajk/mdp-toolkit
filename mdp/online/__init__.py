@@ -23,11 +23,12 @@ from .onlinehinet import (
 from .onlineflows import IFlow
 
 import nodes
+import utils
 
 __all__ = [
         'INode', 'PreserveDimINode','IFlowNode',
         'IFlow','CloneILayer','SameInputILayer',
-        'nodes'
+        'nodes', 'utils'
         ]
 
 from mdp.utils import fixup_namespace

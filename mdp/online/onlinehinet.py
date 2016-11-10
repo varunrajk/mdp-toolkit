@@ -136,4 +136,4 @@ class IFlowNode(mdp.hinet.FlowNode, INode):
     def set_numx_rng(self, rng):
         super(IFlowNode, self).set_numx_rng(rng)
         # set the numx_rng for all the nodes to be the same.
-        [node.set_numx_rng(rng) for node in self._flow.nodes]
+        [node.set_numx_rng(rng) for node in self._flow]

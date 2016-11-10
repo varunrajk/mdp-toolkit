@@ -113,10 +113,15 @@ class IFlow(mdp.Flow):
         # the signal nodes and multiplies them if needed.
         flow = self.flow
 
-        # if a single array is given wrap it in a list of lists,
+        # if a single array is given IFlow trains the nodes
+        # incrementally if it is a 2D array or block incrementally if the
+        # array has 3d shape.
         # note that a list of 2d arrays is not valid
         if isinstance(data_iterables, numx.ndarray):
-            data_iterables = [[data_iterables]] * len(flow)
+            if data_iterables.ndim == 2:
+                data_iterables = [data_iterables[:,mdp.numx.newaxis,:]] * len(flow)
+            else:
+                data_iterables = [data_iterables] * len(flow)
 
         if not isinstance(data_iterables, list):
             err_str = ("'data_iterables' must be either a list of "

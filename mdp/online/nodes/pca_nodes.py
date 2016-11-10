@@ -2,10 +2,10 @@
 import mdp
 from mdp.online import INode
 from mdp.utils import mult
+from past.utils import old_div
 
 class CCIPCANode(INode):
     """
-
     Candid-Covariance free Incremental Principal Component Analysis (CCIPCA)
     extracts the principal components from the input data incrementally.
     More information about Candid-Covariance free Incremental Principal
@@ -13,24 +13,6 @@ class CCIPCANode(INode):
     Candid covariance-free incremental principal component analysis,
     IEEE Trans. Pattern Analysis and Machine Intelligence,
     vol. 25, 1034--1040, 2003.
-
-    **kwargs**
-
-      ``amn_params`` (default: [20,200,2000,3])
-          Amnesic Parameters
-
-      ``init_eigen_vectors`` (default: randomly generated)
-          initial eigen vectors
-
-      ``reduce`` (default: False)
-          Get reducible  dimensionality if set to True
-
-      ``var_rel`` (default: 0.001)
-          Relative variance threshold to get reducible dimensionality
-
-      ``beta`` (default: 1.1)
-          Variance ratio threshold to get reducible dimensionality
-
 
     **Instance variables of interest (stored in cache)**
 
@@ -42,22 +24,31 @@ class CCIPCANode(INode):
 
     """
 
-    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None, **kwargs):
+    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None, 
+                 amn_params=(20,200,2000,3), init_eigen_vectors=None, var_rel=1):
+        """
+        amn_params: Amnesic parameters. Default set to (n1=20,n2=200,m=2000,c=3).
+                            For n < n1, ~ moving average.
+                            For n1 < n < n2 - Transitions from moving average to amnesia. m denotes the scaling param and
+                            c typically should be between (2-4). Higher values will weigh recent data.
+
+        init_eigen_vectors: initial eigen vectors. Default - randomly set
+
+        var_rel: Ratio cutoff to get reduced dimensionality. (Explained variance of reduced dimensionality <= beta * Total variance). Default = 1
+        """
+
         super(CCIPCANode, self).__init__(input_dim, output_dim, dtype, numx_rng)
-        self.kwargs = kwargs
 
-        self.amn_params = self.kwargs.get('amn_params', [20., 200., 2000., 3.])
-        self._init_v = self.kwargs.get('init_eigen_vectors', None)
-        self.reduce = self.kwargs.get('reduce', False)
-        self.var_rel = self.kwargs.get('var_rel', 0.001)
-        self.beta = self.kwargs.get('beta', 1.1)
+        self.amn_params = amn_params
+        self._init_v = init_eigen_vectors
+        self.var_rel = var_rel
 
-        self._v = None  #Internal Eigen Vector (unNormalized and transposed)
-        self.v = None  #Eigen Vector (Normalized) (reduced if reduce is True)
-        self.d = None  #Eigen Value (reduced if reduce is True)
+        self._v = None  #Internal eigenvectors (unnormalized and transposed)
+        self.v = None  #Eigenvectors (Normalized)
+        self.d = None  #Eigenvalues
 
-        self._explained_variance_tot = None #Total Explained Variance
-        self._reducible_dim = self.output_dim  #reducible dimensionality
+        self._var_tot = 1.0
+        self._reduced_dims = self.output_dim
         self._cache = {'eigen_vectors': None, 'eigen_values': None}
 
     @property
@@ -67,22 +58,24 @@ class CCIPCANode(INode):
     @init_eigen_vectors.setter
     def init_eigen_vectors(self, init_eigen_vectors=None):
         self._init_v = init_eigen_vectors
-
-    def _check_input(self, x):
-        super(CCIPCANode, self)._check_input(x)
-
-        if self.output_dim is None:
-            self.output_dim = self.input_dim
-            self.reduced_dim = self.output_dim
-
-    def _check_params(self, x):
-        if self._init_v is None:
-            self._init_v = 0.1 * self.numx_rng.randn(self.output_dim, self.input_dim)
-
-        if self._v is None:
+        if self._input_dim is None:
+            self._input_dim = self._init_v.shape[0]
+        else:
+            assert(self.input_dim == self._init_v.shape[0]), mdp.NodeException('Dimension mismatch. init_eigen_vectors shape[0] must be'
+                                                                               '%d, given %d'%(self.input_dim, self._init_v.shape[0]))
+        if self._output_dim is None:
+            self._output_dim = self._init_v.shape[1]
+        else:
+            assert(self.output_dim == self._init_v.shape[1]), mdp.NodeException('Dimension mismatch. init_eigen_vectors shape[1] must be'
+                                                                               '%d, given %d'%(self.output_dim, self._init_v.shape[1]))
+        if self.v is None:
             self._v = self._init_v.copy()
-            self._d = mdp.numx.sum(mdp.numx.absolute(self._v) ** 2, axis=-1) ** (1. / 2)
-            self._vn = self._v / self._d.reshape(self._v.shape[0], 1)
+            self.d = mdp.numx_linalg.norm(self._v, axis=0)
+            self.v = old_div(self._v,self.d)
+
+    def _check_params(self, *args):
+        if self._init_v is None:
+            self.init_eigen_vectors = 0.1 * self.numx_rng.randn(self.input_dim, self.output_dim)
 
     def _amnesic(self, n):
         _i = float(n + 1)
@@ -103,46 +96,45 @@ class CCIPCANode(INode):
         red_j_Flag = False
         explained_var = 0.0
 
-        r = x.copy()
+        r = x
         for j in xrange(self.output_dim):
-            v = self._v[j:j + 1].copy()
-            v = w1 * v + w2 * mult(r, v.T) / self._d[j] * r
-            self._d[j] = mdp.numx_linalg.norm(v)
-            vn = v / self._d[j]
-            r = r - mult(r, vn.T) * vn
-            explained_var += self._d[j]
+            v = self._v[:,j:j + 1]
+            d = self.d[j]
 
-            if self.reduce and not red_j_Flag:
-                ratio1 = self._d[j] / self._d[0]
-                ratio2 = explained_var / self._explained_variance_tot
-                if (ratio1 < self.var_rel) or (ratio2 > self.beta):
+            v = w1 * v + w2 * mult(r, v) / d * r.T
+            d = mdp.numx_linalg.norm(v)
+            vn = old_div(v,d)
+            r = r - mult(r, vn) * vn.T
+            explained_var += d
+
+            if not red_j_Flag:
+                ratio = explained_var / self._var_tot
+                if (ratio > self.var_rel):
                     red_j = j
                     red_j_Flag = True
-            self._v[j] = v.copy()
-            self._vn[j] = vn.copy()
 
-        if explained_var > 0.0001:
-            self._explained_variance_tot = explained_var
-        self.v = self._vn.T.copy()
-        self.d = self._d.copy()
-        self._reducible_dim = red_j
+            self._v[:,j:j+1] = v
+            self.v[:,j:j+1] = vn
+            self.d[j] = d
 
-        self.cache['eigen_vectors'] = self.v
-        self.cache['eigen_values'] = self.d
+        self._var_tot = explained_var
+        self._reduced_dims = red_j
+        
+        self.cache['eigen_vectors'] = self.v.copy()
+        self.cache['eigen_values'] = self.d.copy()
 
-    def get_explained_variance(self):
-        """Return the fraction of the original variance that can be
+    def get_var_tot(self):
+        """Return the  variance that can be
         explained by self._output_dim PCA components.
         """
-        return self._explained_variance_tot
+        return self._var_tot
 
-    def get_reducible_dimensionality(self):
+    def get_reduced_dimsensionality(self):
         """Return reducible dimensionality based on the set thresholds"""
-        return self._reducible_dim
+        return self._reduced_dims
 
     def get_projmatrix(self, transposed=1):
         """Return the projection matrix."""
-        self._if_training_stop_training()
         if transposed:
             return self.v
         return self.v.T
@@ -150,7 +142,6 @@ class CCIPCANode(INode):
     def get_recmatrix(self, transposed=1):
         """Return the back-projection matrix (i.e. the reconstruction matrix).
         """
-        self._if_training_stop_training()
         if transposed:
             return self.v.T
         return self.v
@@ -179,74 +170,6 @@ class CCIPCANode(INode):
 
 
 
-class MCANode(CCIPCANode):
-    """
-
-    Minor Component Analysis (MCA) extracts minor components from the
-    input data incrementally. More information about MCA can be found in
-    Peng, D. and Yi, Z, A new algorithm for sequential minor component analysis,
-    International Journal of Computational Intelligence Research,
-    2(2):207--215, 2006.
-
-    **kwargs**
-
-      ``eps`` (default: 0.01)
-          Learning rate
-
-      ``gamma`` (default: 1.0)
-          Sequential addition coefficient
-
-      ``normalize`` (default: True)
-          If True, eigenvectors are normalized after every update.
-          Useful for non-stationary input data.
-
-      ``init_eigen_vectors`` (default: randomly generated)
-          initial eigen vectors
-
-
-    **Instance variables of interest (stored in cache)**
-
-      ``eigen_vectors`` (can also be accessed as self.v)
-         Eigen vectors
-
-      ``eigen_values`` (can also be accessed as self.d)
-         Eigen values
-
-
-    """
-
-    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None, **kwargs):
-        super(MCANode, self).__init__(input_dim, output_dim, dtype, numx_rng, **kwargs)
-        self.eps = self.kwargs.get('eps', 0.01)
-        self.gamma = self.kwargs.get('gamma', 1.0)
-        self.normalize = self.kwargs.get('normalize', True)
-
-    def _train(self, x):
-        C = mult(x.T, x)
-        for j in xrange(self.output_dim):
-            n = self.eps / (1 + j * 1.2)
-            v = self._v[j:j + 1, :x.shape[1]].T
-            a = mult(C, v)
-            if self.normalize:
-                v = (1.5 - n) * v - n * a
-            else:
-                v = (1.5 - n * (self.d[j] ** 2)) * v - n * a
-            l = mult(v.T, v)
-            C = C + self.gamma * mult(v, v.T) / l
-            v = v.T
-            self.d[j] = mdp.numx.sqrt(l)
-            if self.normalize:
-                self._v[j, :x.shape[1]] = v / self.d[j]
-            else:
-                self._v[j, :x.shape[1]] = v.copy()
-
-        self.v = self._v[:, :x.shape[1]].copy()
-
-        self.cache['eigen_vectors'] = self.v
-        self.cache['eigen_values'] = self.d
-
-
-
 class WhiteningNode(CCIPCANode):
     """
 
@@ -255,18 +178,12 @@ class WhiteningNode(CCIPCANode):
     """
     __doc__ = __doc__ + "\t" +  "#"*30 +  CCIPCANode.__doc__
 
-    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None, **kwargs):
-        super(WhiteningNode, self).__init__(input_dim, output_dim, dtype, numx_rng, **kwargs)
-
-    def _normalize(self, v, d):
-        wv = mdp.numx.zeros(v.shape)
-        for i in xrange(wv.shape[0]):
-            wv[:,i] = v[:,i] / mdp.numx.sqrt(d[i])
-        return wv
+    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None,
+                 amn_params=(20,200,2000,3), init_eigen_vectors=None, var_rel=1):
+        super(WhiteningNode, self).__init__(input_dim, output_dim, dtype, numx_rng,
+                 amn_params, init_eigen_vectors, var_rel)
 
     def _train(self, x):
-        super(WhiteningNode,self).train(x)
-        self.v = self._normalize(self.v, self.d)
+        super(WhiteningNode,self)._train(x)
+        self.v = old_div(self.v, mdp.numx.sqrt(self.d))
         self.cache['eigen_vectors'] = self.v
-        self.cache['eigen_values'] = mdp.numx.ones(self.d.shape)
-
