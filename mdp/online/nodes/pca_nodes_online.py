@@ -1,10 +1,10 @@
 
 import mdp
-from mdp.online import INode
+from mdp.online import OnlineNode
 from mdp.utils import mult
 from past.utils import old_div
 
-class CCIPCANode(INode):
+class CCIPCANode(OnlineNode):
     """
     Candid-Covariance free Incremental Principal Component Analysis (CCIPCA)
     extracts the principal components from the input data incrementally.
@@ -170,7 +170,7 @@ class CCIPCANode(INode):
 
 
 
-class WhiteningNode(CCIPCANode):
+class CCIPCAWhiteningNode(CCIPCANode):
     """
 
     Incrementally updates whitening vectors for the input data using CCIPCA.
@@ -180,10 +180,10 @@ class WhiteningNode(CCIPCANode):
 
     def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None,
                  amn_params=(20,200,2000,3), init_eigen_vectors=None, var_rel=1):
-        super(WhiteningNode, self).__init__(input_dim, output_dim, dtype, numx_rng,
+        super(CCIPCAWhiteningNode, self).__init__(input_dim, output_dim, dtype, numx_rng,
                  amn_params, init_eigen_vectors, var_rel)
 
     def _train(self, x):
-        super(WhiteningNode,self)._train(x)
+        super(CCIPCAWhiteningNode,self)._train(x)
         self.v = old_div(self.v, mdp.numx.sqrt(self.d))
         self.cache['eigen_vectors'] = self.v

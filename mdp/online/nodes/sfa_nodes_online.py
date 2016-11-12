@@ -1,13 +1,13 @@
 
 import mdp
-from mdp.online import INode
-from .pca_nodes import WhiteningNode
-from .mca_nodes import MCANode
-from .standard_stats_nodes import MovingDiffNode
+from mdp.online import OnlineNode
+from .pca_nodes_online import CCIPCAWhiteningNode as WhiteningNode
+from .mca_nodes_online import MCANode
+from .stats_nodes_online import MovingTimeDiffNode
 from mdp.utils import mult
 import warnings as _warn
 
-class IncSFANode(INode):
+class IncSFANode(OnlineNode):
     """
 
     Incremental Slow Feature Analysis (IncSFA) extracts the slowly varying
@@ -61,7 +61,7 @@ class IncSFANode(INode):
         self.whiteningnode = WhiteningNode(input_dim=input_dim, output_dim=self.whitening_output_dim,
                                            dtype=dtype, numx_rng=numx_rng, init_eigen_vectors=init_pca_vectors,
                                            amn_params=amn_params)
-        self.tdiffnode = MovingDiffNode(numx_rng=numx_rng)
+        self.tdiffnode = MovingTimeDiffNode(numx_rng=numx_rng)
         self.mcanode = MCANode(input_dim=self.whitening_output_dim, output_dim=output_dim,
                                dtype=dtype, numx_rng=numx_rng, init_eigen_vectors=init_mca_vectors, eps=eps)
 

@@ -1,14 +1,14 @@
 
 
 import mdp
-from mdp.online import PreserveDimINode
+from mdp.online import PreserveDimOnlineNode
 
-class SignalAvgNode(PreserveDimINode):
+class SignalAvgNode(PreserveDimOnlineNode):
     """Compute moving average on the input data.
      Also supports exponentially weighted moving average when
      the parameter avg_n is set.
 
-    This is an online learnable node (INode)
+    This is an online learnable node (OnlineNode)
 
     **Internal variables of interest (stored in cache)**
 
@@ -56,9 +56,9 @@ class SignalAvgNode(PreserveDimINode):
         return self.avg
 
 
-class MovingDiffNode(PreserveDimINode):
+class MovingTimeDiffNode(PreserveDimOnlineNode):
     def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
-        super(MovingDiffNode, self).__init__(input_dim, output_dim, dtype, numx_rng)
+        super(MovingTimeDiffNode, self).__init__(input_dim, output_dim, dtype, numx_rng)
         self.x_prev = None
         self.x_cur = None
 

@@ -1,10 +1,10 @@
 
 import mdp
-from mdp.online import INode
+from mdp.online import OnlineNode
 from mdp.utils import mult
 from past.utils import old_div
 
-class MCANode(INode):
+class MCANode(OnlineNode):
     """
     Minor Component Analysis (MCA) extracts minor components from the
     input data incrementally. More information about MCA can be found in

@@ -2,15 +2,15 @@
 
 __docformat__ = "restructuredtext en"
 
-from .standard_stats_nodes import SignalAvgNode, MovingDiffNode
+from .stats_nodes_online import SignalAvgNode, MovingTimeDiffNode
 
-from .pca_nodes import CCIPCANode, WhiteningNode
+from .pca_nodes_online import CCIPCANode, CCIPCAWhiteningNode
 
-from .mca_nodes import MCANode
+from .mca_nodes_online import MCANode
 
-from .sfa_nodes import IncSFANode
+from .sfa_nodes_online import IncSFANode
 
-__all__ = ['SignalAvgNode', 'MovingDiffNode', 'CCIPCANode', 'WhiteningNode', 'MCANode',
+__all__ = ['SignalAvgNode', 'MovingTimeDiffNode', 'CCIPCANode', 'CCIPCAWhiteningNode', 'MCANode',
            'IncSFANode']
 
 from mdp.utils import fixup_namespace
