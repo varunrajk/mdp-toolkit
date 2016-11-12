@@ -5,10 +5,10 @@ from mdp import NodeException, IsNotTrainableException
 from mdp import TrainingException, TrainingFinishedException, IsNotInvertibleException
 from mdp import Node
 
-class INode(Node):
+class OnlineNode(Node):
 
-    """An incremental Node (INode) is the basic building block of
-        an online (incremental) MDP application.
+    """An online Node (OnlineNode) is the basic building block of
+        an online MDP application.
 
         It represents a data processing element, like for example a learning
         algorithm, a data filter, or a visualization step.
@@ -19,22 +19,22 @@ class INode(Node):
         or backwards (by applying the inverse of the transformation computed by
         the node if defined).
 
-        INodes have been designed to be updated incrementally or block-incrementally
-        by a continuous stream of input data. It is thus possible to perform
+        OnlineNodes have been designed to be updated incrementally or block-incrementally
+        on a continuous stream of input data. It is thus possible to perform
         computations on amounts of data that would not fit into memory or
         to generate data on-the-fly.
 
-        An `INode` also defines some utility methods, like for example
+        An `OnlineNode` also defines some utility methods, like for example
         `copy` and `save`, that return an exact copy of a node and save it
         in a file, respectively. Additional methods may be present, depending
         on the algorithm.
 
-        INodes also supports using a pre-seeded random number generator (through
+        OnlineNodes also supports using a pre-seeded random number generator (through
         'numx_rng' parameter. This can be used to replicate results.
 
-        `INode` subclasses should take care of overwriting (if necessary)
-        the functions `_train`, `_stop_training`, `_execute`,
-        `is_invertible`, `_inverse`, '_init_params', and `_get_supported_dtypes`.
+        `OnlineNode` subclasses should take care of overwriting (if necessary)
+        the functions `_train`, `_stop_training`, `_execute`, 'is_trainable',
+        `is_invertible`, `_inverse`, 'set_training_type', and `_get_supported_dtypes`.
         If you need to overwrite the getters and setters of the
         node's properties refer to the docstring of `get_input_dim`/`set_input_dim`,
         `get_output_dim`/`set_output_dim`, `get_dtype`/`set_dtype`, 'get_numx_rng'/'set_numx_rng'.
@@ -53,11 +53,11 @@ class INode(Node):
         structures to match this argument (use `_refcast` private
         method when possible).
         """
-        super(INode, self).__init__(input_dim,output_dim,dtype)
+        super(OnlineNode, self).__init__(input_dim,output_dim,dtype)
         # this var stores the index of the current training iteration
         self._train_iteration = 0
         # this cache var dict stores an interemediate result or paramenter values
-        # at the end of each train iteration. INode subclasses should
+        # at the end of each train iteration. OnlineNode subclasses should
         # initialize the required keys
         self._cache = dict()
         # this var stores random number generator
@@ -154,7 +154,7 @@ class INode(Node):
         pass
 
     def _check_input(self, x):
-        super(INode, self)._check_input(x)
+        super(OnlineNode, self)._check_input(x)
 
         # set the output dimension if necessary
         if self.output_dim is None:
@@ -230,7 +230,7 @@ class INode(Node):
 
     def __add__(self, other):
         # check other is a node
-        if isinstance(other, INode):
+        if isinstance(other, OnlineNode):
             return mdp.Flow([self, other])
         elif isinstance(other, mdp.Flow):
             flow_copy = other.copy()
@@ -242,7 +242,7 @@ class INode(Node):
             raise TypeError(err_str)
 
 
-class PreserveDimINode(INode):
+class PreserveDimOnlineNode(OnlineNode):
     """Abstract base class with ``output_dim == input_dim``.
 
     If one dimension is set then the other is set to the same value.
