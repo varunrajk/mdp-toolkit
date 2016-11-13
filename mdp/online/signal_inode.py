@@ -95,10 +95,7 @@ class OnlineNode(Node):
     def get_cache(self):
         return self._cache
 
-    def set_cache(self, c):
-        self._cache = c
-
-    cache = property(get_cache, set_cache, doc="Internal cache dict")
+    cache = property(get_cache, doc="Internal cache dict")
 
     def get_current_train_iteration(self):
         """Return the index of the current training iteration."""
