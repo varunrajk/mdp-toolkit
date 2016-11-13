@@ -62,9 +62,9 @@ class OnlineLayer(mdp.hinet.Layer, OnlineNode):
         _cache = {}
         for i, node in enumerate(nodes):
             if not hasattr(node, 'cache'):
-                _cache['%s-%d' % (str(node), i)] = {}
+                _cache['node#%d' % (i)] = {}
             else:
-                _cache['%s-%d' % (str(node), i)] = node.cache
+                _cache['node#%d' % (i)] = node.cache
         return _cache
 
     def _set_training_type_from_nodes(self, nodes):
