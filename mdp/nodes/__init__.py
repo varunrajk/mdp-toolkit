@@ -31,6 +31,12 @@ from .xsfa_nodes import XSFANode, NormalizeNode
 from .misc_nodes import OneDimensionalHitParade as _OneDimensionalHitParade
 from .expansion_nodes import expanded_dim as _expanded_dim
 
+from .mca_nodes_online import MCANode
+from .pca_nodes_online import CCIPCANode, CCIPCAWhiteningNode
+from .sfa_nodes_online import IncSFANode
+from .stats_nodes_online import SignalAvgNode, MovingTimeDiffNode
+from .hsfa_nodes import HSFANode, HSFAPoolNode
+
 __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
            'CuBICANode', 'TDSEPNode', 'JADENode', 'SFANode', 'SFA2Node',
            'ISFANode', 'XSFANode', 'FDANode', 'FANode', 'RBMNode',
@@ -45,7 +51,11 @@ __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
            'EtaComputerNode', 'HitParadeNode', 'NoiseNode', 'NormalNoiseNode',
            'TimeFramesNode', 'TimeDelayNode', 'TimeDelaySlidingWindowNode',
            'CutoffNode', 'AdaptiveCutoffNode', 'HistogramNode',
-           'IdentityNode', '_OneDimensionalHitParade']
+           'IdentityNode', '_OneDimensionalHitParade',
+            'SignalAvgNode', 'MovingTimeDiffNode', 'CCIPCANode', 'CCIPCAWhiteningNode', 'MCANode',
+           'IncSFANode', 'HSFANode', 'HSFAPoolNode'
+           ]
+
 
 # nodes with external dependencies
 from mdp import config, numx_description, MDPException
@@ -98,4 +108,9 @@ utils.fixup_namespace(__name__, __all__ + ['ICANode'],
                        'scikits_nodes',
                        'numx_description',
                        'config',
-                       ))
+                       'standard_stats_nodes',
+                       'pca_nodes',
+                       'mca_nodes',
+                       'sfa_nodes',
+                       'hsfa_nodes'
+                        ))

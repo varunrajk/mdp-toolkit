@@ -11,6 +11,10 @@ numx_description = mdp.numx_description
 import random
 import itertools
 
+def update_dict_lists(src, dst):
+    [dst[key].append(src[key]) for key in dst.keys()]
+    return dst
+
 def timediff(data):
     """Returns the array of the time differences of data."""
     # this is the fastest way we found so far

@@ -1,13 +1,13 @@
-
-import mdp
-from mdp.online import OnlineNode
-from .pca_nodes_online import CCIPCAWhiteningNode as WhiteningNode
-from .mca_nodes_online import MCANode
-from .stats_nodes_online import MovingTimeDiffNode
-from mdp.utils import mult
 import warnings as _warn
 
-class IncSFANode(OnlineNode):
+import mdp
+from .mca_nodes_online import MCANode
+from .pca_nodes_online import CCIPCAWhiteningNode as WhiteningNode
+from .stats_nodes_online import SignalAvgNode, MovingTimeDiffNode
+from mdp.utils import mult
+
+
+class IncSFANode(mdp.OnlineNode):
     """
 
     Incremental Slow Feature Analysis (IncSFA) extracts the slowly varying
@@ -66,8 +66,9 @@ class IncSFANode(OnlineNode):
                                dtype=dtype, numx_rng=numx_rng, init_eigen_vectors=init_mca_vectors, eps=eps)
 
         self.remove_mean = remove_mean
+        self.avg_n = avg_n
         if remove_mean:
-            self.avgnode = mdp.online.nodes.SignalAvgNode(numx_rng=numx_rng, avg_n=avg_n)
+            self.avgnode = SignalAvgNode(numx_rng=numx_rng, avg_n=avg_n)
 
         self._new_episode = True
 
@@ -152,4 +153,25 @@ class IncSFANode(OnlineNode):
         if self.remove_mean:
             x = self.avgnode._execute(x)
         return mult(x, self.sf)
+
+
+    def __repr__(self):
+        # print all args
+        name = type(self).__name__
+        inp = "input_dim=%s" % str(self.input_dim)
+        out = "output_dim=%s" % str(self.output_dim)
+        if self.dtype is None:
+            typ = 'dtype=None'
+        else:
+            typ = "dtype='%s'" % self.dtype.name
+        numx_rng = "numx_rng=%s" % str(self.numx_rng)
+        eps = "\neps=%s"% str(self.eps)
+        whit_dim = "whitening_output_dim=%s"%str(self.whitening_output_dim)
+        remove_mean = "remove_mean=%s"%str(self.remove_mean)
+        avg_n = "avg_n=%s"%(self.avg_n)
+        amn = "\namn_params=%s" % str(self.whiteningnode.amn_params)
+        init_pca_vecs = "init_pca_vectors=%s" % str(self.init_pca_vectors)
+        init_mca_vecs = "init_pca_vectors=%s" % str(self.init_mca_vectors)
+        args = ', '.join((inp, out, typ, numx_rng, eps, whit_dim, remove_mean, avg_n, amn, init_pca_vecs, init_mca_vecs))
+        return name + '(' + args + ')'
 

@@ -239,6 +239,20 @@ class OnlineNode(Node):
             raise TypeError(err_str)
 
 
+    def __repr__(self):
+        # print input_dim, output_dim, dtype and numx_rng
+        name = type(self).__name__
+        inp = "input_dim=%s" % str(self.input_dim)
+        out = "output_dim=%s" % str(self.output_dim)
+        if self.dtype is None:
+            typ = 'dtype=None'
+        else:
+            typ = "dtype='%s'" % self.dtype.name
+        numx_rng = "numx_rng=%s"% str(self.numx_rng)
+        args = ', '.join((inp, out, typ, numx_rng))
+        return name + '(' + args + ')'
+
+
 class PreserveDimOnlineNode(OnlineNode):
     """Abstract base class with ``output_dim == input_dim``.
 
@@ -260,3 +274,4 @@ class PreserveDimOnlineNode(OnlineNode):
             raise mdp.InconsistentDimException(err)
         self._input_dim = n
         self._output_dim = n
+

@@ -2,7 +2,7 @@ from __future__ import print_function
 from builtins import str
 __docformat__ = "restructuredtext en"
 
-from .routines import (timediff, refcast, scast, rotate, random_rot,
+from .routines import (update_dict_lists, timediff, refcast, scast, rotate, random_rot,
                       permute, symrand, norm2, cov2,
                       mult_diag, comb, sqrtm, get_dtypes, nongeneral_svd,
                       hermitian, cov_maxima,
@@ -87,7 +87,7 @@ __all__ = ['CovarianceMatrix', 'DelayCovarianceMatrix','CrossCovarianceMatrix',
            'hermitian', 'inv', 'mult', 'mult_diag', 'nongeneral_svd',
            'norm2', 'permute', 'pinv', 'progressinfo',
            'random_rot', 'refcast', 'rotate', 'scast', 'solve', 'sqrtm',
-           'svd', 'symrand', 'timediff', 'matmult',
+           'svd', 'symrand', 'update_dict_lists', 'timediff', 'matmult',
            'HTMLSlideShow', 'ImageHTMLSlideShow',
            'basic_css', 'slideshow_css', 'image_slideshow_css',
            'SectionHTMLSlideShow',

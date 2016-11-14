@@ -2,8 +2,7 @@
 from builtins import str
 import mdp
 from mdp import numx
-from mdp.linear_flows import  FlowException, FlowExceptionCR, _sys, _traceback
-from mdp.online import OnlineNode, ExecutableNode
+from .linear_flows import  FlowException, FlowExceptionCR, _sys, _traceback
 
 class OnlineFlow(mdp.Flow):
     """An 'OnlineFlow' is a sequence of online/executable nodes that are trained and executed
@@ -19,20 +18,21 @@ class OnlineFlow(mdp.Flow):
     OnlineFlow sequence can contain trained or non-trainable Nodes and optionally
     a terminal trainable Node.
 
-    Differences between Flow and OnlineFlow:
-    a) Data is processed sequentially training one node at a time in Flow. Whereas, data
-       is processed simultaneously training all the nodes at the same time in the OnlineFlow.
+    Differences between Flow and an OnlineFlow:
+    a) In Flow, data is processed sequentially training one node at a time. Whereas, in an
+       OnlineFlow data is processed simultaneously training all the nodes at the same time.
 
     b) Flow requires a list of dataiterables with a length equal to the
        number of nodes or a single numpy array. OnlineFlow requires only one
        input dataiterable as each node is trained simultaneously.
 
     c) Additional train args (supervised labels etc) are passed to each node through the
-       node specific dataiterable. OnlineFlow does not (yet) support passing additional
-       train arguments to each node explicitly. Only way it is possible in an OnlineFlow is from
-       the preceding node's execute call. Currently, this is not required. But if needed,
-       one way to make it general is to have a
+       node specific dataiterable. OnlineFlow requires the dataiterable to return a list
+       that contains tuples of args for each node: [x, (node0 args), (node1 args), ...]. See
+       train docstring.
 
+    d) OnlineFlow also has the cache attribute that retrieves any caches variables
+       stored in the OnlineNodes.
 
     Crash recovery is optionally available: in case of failure the current
     state of the flow is saved for later inspection.
@@ -137,7 +137,7 @@ class OnlineFlow(mdp.Flow):
         # is a 3d array (num_blocks, block_size, dim).
         if isinstance(data_iterables, numx.ndarray):
             if data_iterables.ndim == 2:
-                data_iterable = data_iterables[:,mdp.numx.newaxis,:]
+                data_iterables = data_iterables[:,mdp.numx.newaxis,:]
             return data_iterables
 
         # check it it is an iterable
@@ -174,16 +174,16 @@ class OnlineFlow(mdp.Flow):
             print("Training nodes %s simultaneously" % (strn))
         self._train_nodes(data_iterables)
 
-        if not isinstance(self.flow[-1], OnlineNode):
+        if not isinstance(self.flow[-1], mdp.OnlineNode):
             self._close_last_node()
 
     ###### private container methods
 
     def _check_value_type_is_compatible(self, value):
-        # onlinenodes, trained and non-trainable nodes are compatible
+        # onlinenodes, (special case) Executable FlowNode, trained and non-trainable nodes are compatible
         if not isinstance(value, mdp.Node):
             raise TypeError("flow item must be a Node instance and not %s"%(type(value)))
-        elif isinstance(value, ExecutableNode) or isinstance(value, OnlineNode):
+        elif isinstance(value, mdp.hinet.ExecutableFlowNode) or isinstance(value, mdp.OnlineNode):
             pass
         else:
             # classic mdp Node

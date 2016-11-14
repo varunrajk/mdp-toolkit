@@ -1,10 +1,9 @@
 
 import mdp
-from mdp.online import OnlineNode
 from mdp.utils import mult
 from past.utils import old_div
 
-class MCANode(OnlineNode):
+class MCANode(mdp.OnlineNode):
     """
     Minor Component Analysis (MCA) extracts minor components from the
     input data incrementally. More information about MCA can be found in
@@ -133,4 +132,22 @@ class MCANode(OnlineNode):
         if n is not None:
             return mult(y, v[:n, :])
         return mult(y, v)
+
+
+    def __repr__(self):
+        # print all args
+        name = type(self).__name__
+        inp = "input_dim=%s" % str(self.input_dim)
+        out = "output_dim=%s" % str(self.output_dim)
+        if self.dtype is None:
+            typ = 'dtype=None'
+        else:
+            typ = "dtype='%s'" % self.dtype.name
+        numx_rng = "numx_rng=%s" % str(self.numx_rng)
+        eps = "\neps=%s"% str(self.eps)
+        gamma = "gamma=%s"% str(self.gamma)
+        normalize = "normalize=%s"% str(self.normalize)
+        init_eig_vecs = "init_eigen_vectors=%s"%str(self.init_eigen_vectors)
+        args = ', '.join((inp, out, typ, numx_rng, eps, gamma, normalize, init_eig_vecs))
+        return name + '(' + args + ')'
 

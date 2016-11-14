@@ -1,10 +1,9 @@
 
 import mdp
-from mdp.online import OnlineNode
 from mdp.utils import mult
 from past.utils import old_div
 
-class CCIPCANode(OnlineNode):
+class CCIPCANode(mdp.OnlineNode):
     """
     Candid-Covariance free Incremental Principal Component Analysis (CCIPCA)
     extracts the principal components from the input data incrementally.
@@ -168,6 +167,22 @@ class CCIPCANode(OnlineNode):
             return mult(y, v[:n, :])
         return mult(y, v)
 
+
+    def __repr__(self):
+        # print all args
+        name = type(self).__name__
+        inp = "input_dim=%s" % str(self.input_dim)
+        out = "output_dim=%s" % str(self.output_dim)
+        if self.dtype is None:
+            typ = 'dtype=None'
+        else:
+            typ = "dtype='%s'" % self.dtype.name
+        numx_rng = "numx_rng=%s" % str(self.numx_rng)
+        amn = "\namn_params=%s" % str(self.amn_params)
+        init_eig_vecs = "init_eigen_vectors=%s" % str(self.init_eigen_vectors)
+        var_rel = "var_rel=%s"%str(self.var_rel)
+        args = ', '.join((inp, out, typ, numx_rng, amn, init_eig_vecs, var_rel))
+        return name + '(' + args + ')'
 
 
 class CCIPCAWhiteningNode(CCIPCANode):

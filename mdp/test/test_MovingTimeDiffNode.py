@@ -1,6 +1,6 @@
 
-from mdp.online.nodes import MovingTimeDiffNode
-from mdp.test._tools import *
+from mdp.nodes import MovingTimeDiffNode
+from ._tools import *
 
 def test_movingtimediffnode():
     node = MovingTimeDiffNode()

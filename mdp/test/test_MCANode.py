@@ -1,7 +1,6 @@
 
-from mdp.nodes import PCANode, WhiteningNode, PolynomialExpansionNode
-from mdp.online.nodes import MCANode
-from mdp.test._tools import *
+from mdp.nodes import PCANode, WhiteningNode, PolynomialExpansionNode, MCANode
+from ._tools import *
 import time
 
 def test_mcanode_v1():
@@ -60,7 +59,7 @@ def test_mcanode_v2():
     for i in xrange(iterval*input_data.shape[0]):
         node.train(input_data[i%input_data.shape[0]:i%input_data.shape[0]+1])
         if (node.get_current_train_iteration() % 100 == 0):
-            monitor_var = mdp.online.utils.update_dict_lists(node.get_cache(), monitor_var)
+            monitor_var = mdp.utils.update_dict_lists(node.get_cache(), monitor_var)
 
     v = monitor_var['eigen_vectors']
     dcosines = numx.zeros([len(v), output_dim])

@@ -3,10 +3,9 @@ Module for OnlineLayers.
 
 """
 import mdp
-from mdp.online import OnlineNode
+from .layer import Layer, CloneLayer, SameInputLayer
 
-
-class OnlineLayer(mdp.hinet.Layer, OnlineNode):
+class OnlineLayer(Layer, mdp.OnlineNode):
     """OnlineLayers are nodes which consist of multiple horizontally parallel OnlineNodes.
     OnlineLayer also supports trained or non-trainable Nodes.
 
@@ -48,7 +47,7 @@ class OnlineLayer(mdp.hinet.Layer, OnlineNode):
         # onlinenodes, trained and non-trainable nodes are compatible
         if not isinstance(value, mdp.Node):
             raise TypeError("'nodes' item must be a Node instance and not %s"%(type(value)))
-        elif isinstance(value, ExecutableNode) or isinstance(value, OnlineNode):
+        elif isinstance(value, mdp.hinet.ExecutableFlowNode) or isinstance(value, mdp.OnlineNode):
             pass
         else:
             # classic mdp Node
@@ -88,11 +87,11 @@ class OnlineLayer(mdp.hinet.Layer, OnlineNode):
         """Return the train sequence.
            Use OnlineNode train_seq not Layer's
         """
-        return OnlineNode._get_train_seq(self)
+        return mdp.OnlineNode._get_train_seq(self)
 
 
 
-class CloneOnlineLayer(mdp.hinet.CloneLayer, OnlineLayer):
+class CloneOnlineLayer(CloneLayer, OnlineLayer):
     """OnlineLayer with a single node instance that is used multiple times.
 
     The same single node instance is used to build the layer, so
@@ -123,7 +122,7 @@ class CloneOnlineLayer(mdp.hinet.CloneLayer, OnlineLayer):
         self._set_training_type_from_nodes([node])
 
 
-class SameInputOnlineLayer(mdp.hinet.SameInputLayer, OnlineLayer):
+class SameInputOnlineLayer(SameInputLayer, OnlineLayer):
     """SameInputOnlineLayer is an OnlineLayer were all nodes receive the full input.
 
     So instead of splitting the input according to node dimensions, all nodes
@@ -149,109 +148,3 @@ class SameInputOnlineLayer(mdp.hinet.SameInputLayer, OnlineLayer):
         # set training type
         self._set_training_type_from_nodes(nodes)
 
-
-class OnlineFlowNode(mdp.hinet.FlowNode, OnlineNode):
-    """OnlineFlowNode wraps an OnlineFlow of OnlineNodes into a single OnlineNode.
-
-    This is handy if you want to use a OnlineFlow where a OnlineNode is required.
-    Additional args and kwargs for train and execute are supported.
-
-    Unlike an OnlineFlow, OnlineFlowNode only supports either a
-    terminal OnlineNode, trained or non-trainable Node.
-
-    All the read-only container slots are supported and are forwarded to the
-    internal flow.
-    """
-    def __init__(self, flow, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
-        super(OnlineFlowNode, self).__init__(flow=flow, input_dim=input_dim, output_dim=output_dim, dtype=dtype)
-        self._check_compatibilitiy(flow)
-        self._cache = flow.cache
-        # numx_rng will not be set through the super call.
-        # Have to set it explicitly here:
-        self._numx_rng = None
-        self.set_numx_rng(numx_rng)
-        # set training type
-        self._set_training_type_from_flow(flow)
-
-    def _check_compatibilitiy(self, flow):
-        if not isinstance(flow, mdp.online.OnlineFlow):
-            raise TypeError("Flow must be an OnlineFlow type and not %s"%(type(flow)))
-        if not isinstance(flow[-1], mdp.Node):
-            raise TypeError("Flow item must be a Node instance and not %s"%(type(flow[-1])))
-        elif isinstance(flow[-1], OnlineNode) or isinstance(flow[-1], ExecutableNode):
-            pass
-        else:
-            # classic mdp Node
-            if flow[-1].is_training():
-                raise TypeError("OnlineFlowNode supports either only a terminal OnlineNode, a trained or a non-trainable Node.")
-
-
-    def _set_training_type_from_flow(self, flow):
-        for node in flow:
-            if hasattr(node, 'training_type') and (node.training_type == 'incremental'):
-                self._training_type = 'incremental'
-                return
-        self._training_type = 'batch'
-
-    def set_training_type(self, training_type):
-        if self.training_type != training_type:
-            raise mdp.NodeException("Cannot change the training type to %s. It is inferred from "
-                                    "the flow and is set to '%s'. "%(training_type, self.training_type))
-
-    def set_cache(self, c):
-        raise mdp.NodeException("Cannot set the read only cache attribute. ")
-
-    def set_numx_rng(self, rng):
-        super(OnlineFlowNode, self).set_numx_rng(rng)
-        # set the numx_rng for all the nodes to be the same.
-        for node in self._flow:
-            if hasattr(node, 'set_numx_rng'):
-                node.set_numx_rng(rng)
-
-
-class ExecutableNode(mdp.hinet.FlowNode):
-    """ExecutableNode wraps a FlowNode over a Node, or a list of Nodes or a Flow, to make it executable without
-    calling the stop_training function implicitly.
-
-    An _interim_execute function is called until the training is complete.
-    Once the training is complete (done by calling the required number of stop_training
-     calls explicitly), the standard _execute function is called from then on.
-
-    This node could be useful to combine Nodes with OnlineNodes in an OnlineFlow.
-
-    """
-    def __init__(self, flow, input_dim=None, output_dim=None, dtype=None):
-        if isinstance(flow, mdp.Node):
-            flow = mdp.Flow([flow])
-        elif isinstance(flow, list):
-            flow = mdp.Flow(flow)
-        super(ExecutableNode, self).__init__(flow=flow, input_dim=input_dim, output_dim=output_dim, dtype=dtype)
-
-    def _interim_execute(self, x, *args, **kwargs):
-        # Can be replaced in a subclass
-        outx = mdp.numx.zeros((x.shape[0], self.output_dim))
-        outx[:] = None
-        return outx
-
-    def execute(self, x, *args, **kwargs):
-        """Process the data contained in `x`.
-
-        If the object is still in the training phase, the function
-        `stop_training` will be called.
-        `x` is a matrix having different variables on different columns
-        and observations on the rows.
-
-        By default, subclasses should overwrite `_execute` to implement
-        their execution phase. The docstring of the `_execute` method
-        overwrites this docstring.
-        """
-        if self.is_training():
-            # control the dimension x
-            self._check_input(x)
-            # set the output dimension if necessary
-            if self.output_dim is None:
-                self.output_dim = self.input_dim
-            return self._interim_execute(self._refcast(x), *args, **kwargs)
-        else:
-            self._pre_execution_checks(x)
-            return self._execute(self._refcast(x), *args, **kwargs)

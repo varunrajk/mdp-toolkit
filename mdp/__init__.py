@@ -143,8 +143,12 @@ from .linear_flows import CrashRecoveryException, FlowException, FlowExceptionCR
 from .signal_node import (NodeMetaclass, Node, PreserveDimNode,
                          Cumulator, VariadicCumulator)
 
+from .signal_online_node import OnlineNode, PreserveDimOnlineNode
+
 from .linear_flows import (Flow, CheckpointFlow,
                           CheckpointFunction, CheckpointSaveFunction)
+
+from .online_flows import OnlineFlow
 
 # import helper functions:
 from .helper_funcs import pca, fastica
@@ -166,8 +170,8 @@ from .classifier_node import (ClassifierNode, ClassifierCumulator)
 from . import nodes
 from . import hinet
 from . import parallel
-from . import online
 from .test import test
+
 
 # explicitly set __all__, mainly needed for epydoc
 __all__ = ['config',
@@ -183,12 +187,14 @@ __all__ = ['config',
            'Flow',
            'FlowException',
            'FlowExceptionCR',
+           'OnlineFlow',
            'IsNotInvertibleException',
            'IsNotTrainableException',
            'MDPException',
            'MDPWarning',
            'Node',
            'NodeException',
+           'OnlineNode',
            'TrainingException',
            'TrainingFinishedException',
            'VariadicCumulator',
@@ -205,7 +211,6 @@ __all__ = ['config',
            'hinet',
            'nodes',
            'parallel',
-           'online',
            'pca',
            'fastica',
            'utils',
@@ -218,7 +223,9 @@ if config.has_joblib:
 
 utils.fixup_namespace(__name__, __all__,
                       ('signal_node',
+                       'signal_online_node',
                        'linear_flows',
+                       'online_flows',
                        'helper_funcs',
                        'classifier_node',
                        'configuration',

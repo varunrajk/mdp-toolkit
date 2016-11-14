@@ -1,7 +1,7 @@
 
-from mdp.test._tools import *
+from ._tools import *
 from mdp import numx
-from mdp.online import OnlineFlow, CircularFlow
+from mdp import OnlineFlow
 
 
 from future import standard_library
@@ -14,14 +14,14 @@ import pickle
 uniform = numx_rand.random
 
 
-class BogusOnlineNode(mdp.online.OnlineNode):
+class BogusOnlineNode(mdp.OnlineNode):
     def _check_params(self, x):
         if not hasattr(self, 'sum'): self.sum = mdp.numx.zeros((1,self.input_dim))
     def _train(self, x): self.sum += x
     def _execute(self,x): return x + 1
     def _inverse(self,x): return x - 1
 
-class BogusOnlineNode1(mdp.online.OnlineNode):
+class BogusOnlineNode1(mdp.OnlineNode):
     def _check_params(self, x):
         if not hasattr(self, 'sum'): self.sum = mdp.numx.zeros((1,self.input_dim))
     def _train(self, x): self.sum += x
@@ -29,7 +29,7 @@ class BogusOnlineNode1(mdp.online.OnlineNode):
     @staticmethod
     def is_invertible(): return False
 
-class BogusOnlineDiffDimNode(mdp.online.OnlineNode):
+class BogusOnlineDiffDimNode(mdp.OnlineNode):
     def _check_params(self, x):
         if not hasattr(self, 'sum'): self.sum = mdp.numx.zeros((1,self.input_dim))
     def _train(self, x): self.sum += x
@@ -63,9 +63,9 @@ def test_flow_copy():
            'Flow copy method did not work'
 
 def test_flow_copy_with_lambda():
-    generic_node = mdp.online.OnlineNode()
+    generic_node = mdp.OnlineNode()
     generic_node.lambda_function = lambda: 1
-    generic_flow = mdp.online.OnlineFlow([generic_node])
+    generic_flow = mdp.OnlineFlow([generic_node])
     generic_flow.copy()
 
 def test_flow_save():
@@ -106,7 +106,7 @@ def test_flow_container_privmethods():
     # test __?etitem__, normal slice -> this fails for python < 2.2 and
     # if Flow is a subclassed from builtin 'list'
     flowslice = flow[0:2]
-    assert isinstance(flowslice,mdp.online.OnlineFlow), \
+    assert isinstance(flowslice,mdp.OnlineFlow), \
            '__getitem__ slice is not an OnlineFlow instance'
     assert len(flowslice) == 2, '__getitem__ returned wrong slice size'
     new_nodes_list = [BogusOnlineNode(), BogusOnlineNode()]
@@ -115,7 +115,7 @@ def test_flow_container_privmethods():
            (flow[1] == new_nodes_list[1]), '__setitem__ did not set slice'
     # test__?etitem__, extended slice
     flowslice = flow[:2:1]
-    assert isinstance(flowslice,mdp.online.OnlineFlow), \
+    assert isinstance(flowslice,mdp.OnlineFlow), \
            '__getitem__ slice is not a Flow instance'
     assert len(flowslice) == 2, '__getitem__ returned wrong slice size'
     new_nodes_list = [BogusOnlineNode(), BogusOnlineNode()]
@@ -123,20 +123,20 @@ def test_flow_container_privmethods():
     assert (flow[0] == new_nodes_list[0]) and \
            (flow[1] == new_nodes_list[1]), '__setitem__ did not set slice'
     # test __delitem__, integer key
-    copy_flow = mdp.online.OnlineFlow(flow[:])
+    copy_flow = mdp.OnlineFlow(flow[:])
     del copy_flow[0]
     assert len(copy_flow) == len(flow)-1, '__delitem__ did not del'
     for i in range(len(copy_flow)):
         assert copy_flow[i] == flow[i+1], '__delitem__ deleted wrong node'
     # test __delitem__, normal slice
-    copy_flow = mdp.online.OnlineFlow(flow[:])
+    copy_flow = mdp.OnlineFlow(flow[:])
     del copy_flow[:2]
     assert len(copy_flow) == len(flow)-2, \
            '__delitem__ did not del normal slice'
     assert copy_flow[0] == flow[2], \
            '__delitem__ deleted wrong normal slice'
     # test __delitem__, extended slice
-    copy_flow = mdp.online.OnlineFlow(flow[:])
+    copy_flow = mdp.OnlineFlow(flow[:])
     del copy_flow[:2:1]
     assert len(copy_flow) == len(flow)-2, \
            '__delitem__ did not del extended slice'
@@ -239,38 +239,10 @@ def test_flow_container_listmethods():
         assert_equal(len(flow), length)
 
 
-def test_circular_flow():
-    flow = CircularFlow([BogusNode(input_dim=2, output_dim=2),
-                                    BogusOnlineDiffDimNode(input_dim=2, output_dim=4),
-                                    BogusNode(input_dim=4, output_dim=4),
-                                    BogusOnlineDiffDimNode(input_dim=4, output_dim=2)])
-
-    flow.set_output_node(2)
-    inp = numx.ones((1, 2))
-    flow.train(inp)
-    out = flow(inp)
-    assert(out.shape[1] == flow[2].output_dim)
-    assert(flow.get_stored_input().shape[1] == flow[3].output_dim)
-
-    flow = CircularFlow([BogusNode(),
-                                    BogusOnlineNode1(),
-                                    BogusNode(),
-                                    BogusOnlineNode1()])
-
-    inp = numx.ones((1, 2))
-    flow.train(inp)
-    out = flow(inp)
-
-    assert_array_equal(out, inp*4)
-    flow.train(2)
-    out = flow(inp)
-    assert_array_equal(out, inp*140)
-
-
-def test_executable_node():
+def test_executable_flow_node():
     node = mdp.nodes.SFANode()
     x = numx.random.randn(100,3)
-    exenode = mdp.online.ExecutableNode(node)
+    exenode = mdp.hinet.ExecutableFlowNode(node)
     exenode.train(x)
     interim_out = exenode.execute(x)
     assert(numx.isnan(interim_out).any())
