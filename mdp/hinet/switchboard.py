@@ -12,7 +12,7 @@ from past.utils import old_div
 
 import mdp
 from mdp import numx
-
+import numpy as _numx
 
 class SwitchboardException(mdp.NodeException):
     """Exception for routing problems in the Switchboard class."""
@@ -776,4 +776,32 @@ class RandomChannelSwitchboard(ChannelSwitchboard):
     def _execute(self, x):
         self.connections = self._new_connections()
         return x[:, self.connections]
+
+
+
+class Pool2D(Rectangular2dSwitchboard):
+    def __init__(self, in_channels_xy, field_channels_xy, field_spacing_xy=None, in_channel_dim=1, ignore_cover=True, mode='max'):
+        if field_spacing_xy is None:
+            field_spacing_xy = field_channels_xy
+        elif (field_spacing_xy[0] is None) or (field_spacing_xy[1] is None):
+            field_spacing_xy = (field_channels_xy[0] if field_spacing_xy[0] is None else field_spacing_xy[0],
+                                field_channels_xy[1] if field_spacing_xy[1] is None else field_spacing_xy[1])
+
+        super(Pool2D, self).__init__(in_channels_xy, field_channels_xy, field_spacing_xy, in_channel_dim, ignore_cover)
+        self.mode = mode
+        self._set_output_dim(mdp.numx.prod(self.out_channels_xy)*self.in_channel_dim)
+        if mode == 'max':
+            self._fn = _numx.max
+        elif mode == 'mean':
+            self._fn = _numx.mean
+        elif mode == 'sum':
+            self._fn = _numx.sum
+        else:
+            raise mdp.NodeException('Unknown mode for pooling.')
+
+    def _execute(self, x):
+        x = super(Pool2D, self)._execute(x)
+        dim = x.shape[1]/self.output_dim
+        xout = self._fn(x.reshape(x.shape[0],mdp.numx.prod(self.out_channels_xy),dim,self.in_channel_dim), axis=2)
+        return xout.reshape(x.shape[0], self.output_dim)
 
