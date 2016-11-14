@@ -801,7 +801,7 @@ class Pool2D(Rectangular2dSwitchboard):
 
     def _execute(self, x):
         x = super(Pool2D, self)._execute(x)
-        dim = x.shape[1]/self.output_dim
+        dim = int(x.shape[1]/self.output_dim)
         xout = self._fn(x.reshape(x.shape[0],mdp.numx.prod(self.out_channels_xy),dim,self.in_channel_dim), axis=2)
         return xout.reshape(x.shape[0], self.output_dim)
 

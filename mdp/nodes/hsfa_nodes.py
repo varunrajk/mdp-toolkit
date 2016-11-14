@@ -184,7 +184,7 @@ class HSFANode(mdp.Node):
             else:
                 sfa2_node = mdp.nodes.SFANode(input_dim=exp_node.output_dim,output_dim=n_features[1])
             flow.extend([exp_node, sfa2_node])
-        node = mdp.hinet.mdp.hinet.FlowNode(mdp.Flow(flow))
+        node = mdp.hinet.FlowNode(mdp.Flow(flow))
         return node
 
     @property
@@ -297,7 +297,7 @@ class HSFANode(mdp.Node):
         title = type(self).__name__
         html_file.write('<html>\n<head>\n<title>%s</title>\n' % title)
         html_file.write('<style type="text/css" media="screen">')
-        html_file.write(self._css() + mdp.hinet.HiNetHTMLVisitor.hinet_css())
+        html_file.write(mdp.utils.basic_css() + mdp.hinet.HiNetHTMLVisitor.hinet_css())
         html_file.write('</style>\n</head>\n<body>\n')
         html_file.write('<h3>%s</h3>\n' % title)
         explanation = '(data flows from top to bottom)'
@@ -307,17 +307,17 @@ class HSFANode(mdp.Node):
             html_file.write('<table class=\"flow1\"><tr><td>\n')
             html_file.write('<h4>Training Flow</h4>')
             for i in xrange(len(self._training_flow)):
-                converter = mdp.hinet.mdp.hinet.HiNetHTMLVisitor(html_file, show_size=show_size)
+                converter = mdp.hinet.HiNetHTMLVisitor(html_file, show_size=show_size)
                 if i > 0:
                     html_file.write('<h5>Input from execution layer-%d</h5>'%(i-1))
                 converter.convert_flow(flow=self._training_flow[i])
             html_file.write('</tr></td></table>\n')
             html_file.write('<table class=\"flow1\"><tr><td>\n')
             html_file.write('<h4>Execution Flow</h4>')
-            converter = mdp.hinet.mdp.hinet.HiNetHTMLVisitor(html_file, show_size=show_size)
+            converter = mdp.hinet.HiNetHTMLVisitor(html_file, show_size=show_size)
             converter.convert_flow(flow=self._execution_flow)
         else:
-            converter = mdp.hinet.mdp.hinet.HiNetHTMLVisitor(html_file, show_size=show_size)
+            converter = mdp.hinet.HiNetHTMLVisitor(html_file, show_size=show_size)
             converter.convert_flow(flow=self._execution_flow)
         html_file.write('</tr></td></table>\n')
         html_file.write('</body>\n</html>')
