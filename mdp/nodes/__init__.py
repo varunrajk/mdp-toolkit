@@ -108,9 +108,9 @@ utils.fixup_namespace(__name__, __all__ + ['ICANode'],
                        'scikits_nodes',
                        'numx_description',
                        'config',
-                       'standard_stats_nodes',
-                       'pca_nodes',
-                       'mca_nodes',
-                       'sfa_nodes',
+                       'stats_nodes_online',
+                       'pca_nodes_online',
+                       'mca_nodes_online',
+                       'sfa_nodes_online',
                        'hsfa_nodes'
                         ))
