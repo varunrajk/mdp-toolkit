@@ -29,7 +29,7 @@ then feed the output into a Layer and each Node will get the correct input.
 
 from .flownode import (FlowNode, OnlineFlowNode, ExecutableFlowNode)
 from .layer import Layer, SameInputLayer, CloneLayer
-from .online_layer import OnlineLayer, SameInputOnlineLayer, CloneOnlineLayer
+from .layer_online import OnlineLayer, SameInputOnlineLayer, CloneOnlineLayer
 from .switchboard import (
     Switchboard, SwitchboardException, MeanInverseSwitchboard,
     ChannelSwitchboard,
@@ -63,7 +63,7 @@ from mdp.utils import fixup_namespace
 fixup_namespace(__name__, __all__,
                 ('flownode',
                  'layer',
-                 'online_layer',
+                 'layer_online',
                  'switchboard',
                  'hinet_Visitor',
                  'switchboard_factory',

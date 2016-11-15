@@ -143,12 +143,12 @@ from .linear_flows import CrashRecoveryException, FlowException, FlowExceptionCR
 from .signal_node import (NodeMetaclass, Node, PreserveDimNode,
                          Cumulator, VariadicCumulator)
 
-from .signal_online_node import OnlineNode, PreserveDimOnlineNode
+from .signal_node_online import OnlineNode, PreserveDimOnlineNode
 
 from .linear_flows import (Flow, CheckpointFlow,
                           CheckpointFunction, CheckpointSaveFunction)
 
-from .online_flows import OnlineFlow
+from .linear_flows_online import OnlineFlow
 
 # import helper functions:
 from .helper_funcs import pca, fastica
@@ -223,9 +223,9 @@ if config.has_joblib:
 
 utils.fixup_namespace(__name__, __all__,
                       ('signal_node',
-                       'signal_online_node',
+                       'signal_node_online',
                        'linear_flows',
-                       'online_flows',
+                       'linear_flows_online',
                        'helper_funcs',
                        'classifier_node',
                        'configuration',
