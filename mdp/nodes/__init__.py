@@ -34,7 +34,7 @@ from .expansion_nodes import expanded_dim as _expanded_dim
 from .mca_nodes_online import MCANode
 from .pca_nodes_online import CCIPCANode, CCIPCAWhiteningNode
 from .sfa_nodes_online import IncSFANode
-from .stats_nodes_online import SignalAvgNode, MovingTimeDiffNode
+from .stats_nodes_online import MovingAvgNode, MovingTimeDiffNode
 from .hsfa_nodes import HSFANode, HSFAPoolNode
 
 __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
@@ -52,7 +52,7 @@ __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
            'TimeFramesNode', 'TimeDelayNode', 'TimeDelaySlidingWindowNode',
            'CutoffNode', 'AdaptiveCutoffNode', 'HistogramNode',
            'IdentityNode', '_OneDimensionalHitParade',
-            'SignalAvgNode', 'MovingTimeDiffNode', 'CCIPCANode', 'CCIPCAWhiteningNode', 'MCANode',
+            'MovingAvgNode', 'MovingTimeDiffNode', 'CCIPCANode', 'CCIPCAWhiteningNode', 'MCANode',
            'IncSFANode', 'HSFANode', 'HSFAPoolNode'
            ]
 

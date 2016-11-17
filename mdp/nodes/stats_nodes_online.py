@@ -2,7 +2,7 @@
 
 import mdp
 
-class SignalAvgNode(mdp.PreserveDimOnlineNode):
+class MovingAvgNode(mdp.PreserveDimOnlineNode):
     """Compute moving average on the input data.
      Also supports exponentially weighted moving average when
      the parameter avg_n is set.
@@ -22,7 +22,7 @@ class SignalAvgNode(mdp.PreserveDimOnlineNode):
                 represents about 86% of the total weight.
         """
 
-        super(SignalAvgNode, self).__init__(input_dim=input_dim, output_dim=None, dtype=dtype, numx_rng=numx_rng)
+        super(MovingAvgNode, self).__init__(input_dim=input_dim, output_dim=None, dtype=dtype, numx_rng=numx_rng)
         self.avg_n = avg_n
         self.avg = None
         self._cache = {'avg': None}

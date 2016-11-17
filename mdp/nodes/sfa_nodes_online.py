@@ -3,7 +3,7 @@ import warnings as _warn
 import mdp
 from .mca_nodes_online import MCANode
 from .pca_nodes_online import CCIPCAWhiteningNode as WhiteningNode
-from .stats_nodes_online import SignalAvgNode, MovingTimeDiffNode
+from .stats_nodes_online import MovingAvgNode, MovingTimeDiffNode
 from mdp.utils import mult
 
 
@@ -68,7 +68,7 @@ class IncSFANode(mdp.OnlineNode):
         self.remove_mean = remove_mean
         self.avg_n = avg_n
         if remove_mean:
-            self.avgnode = SignalAvgNode(numx_rng=numx_rng, avg_n=avg_n)
+            self.avgnode = MovingAvgNode(numx_rng=numx_rng, avg_n=avg_n)
 
         self._new_episode = True
 
