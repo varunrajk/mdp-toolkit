@@ -65,6 +65,8 @@ class config(with_metaclass(MetaConfig, object)):
         inhibit loading of the ``joblib`` module and `mdp.caching`
       ``MDP_DISABLE_SKLEARN``
         inhibit loading of the ``sklearn`` module
+      ``MDP_DISABLE_PYQTGRAPH``
+        inhibit loading of the ``pyqtgraph`` module
       ``MDPNSDEBUG``
         print debugging information during the import process
       ``MDP_PP_SECRET``
@@ -432,3 +434,19 @@ def set_configuration():
                                      'version %s is too old' % version)
         else:
             config.ExternalDepFound('sklearn', version)
+
+
+    # pyqtgraph
+    try:
+        import pyqtgraph
+    except ImportError as exc:
+        config.ExternalDepFailed('pyqtgraph', exc)
+    else:
+        version = pyqtgraph.__version__
+        if os.getenv('MDP_DISABLE_PYQTGRAPH'):
+            config.ExternalDepFailed('pyqtgraph', 'disabled')
+        elif _version_too_old(version, (0, 9, 2)):
+            config.ExternalDepFailed('pyqtgraph',
+                                     'version %s is too old' % version)
+        else:
+            config.ExternalDepFound('pyqtgraph', version)

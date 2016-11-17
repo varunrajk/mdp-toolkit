@@ -13,7 +13,7 @@ from .em_nodes import FANode
 from .misc_nodes import (IdentityNode, HitParadeNode, TimeFramesNode,
                         TimeDelayNode, TimeDelaySlidingWindowNode,
                         EtaComputerNode, NoiseNode, NormalNoiseNode,
-                        CutoffNode, HistogramNode, AdaptiveCutoffNode)
+                        CutoffNode, HistogramNode, AdaptiveCutoffNode, NumxBufferNode)
 from .isfa_nodes import ISFANode
 from .rbm_nodes import RBMNode, RBMWithLabelsNode
 from .regression_nodes import LinearRegressionNode
@@ -53,7 +53,7 @@ __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
            'CutoffNode', 'AdaptiveCutoffNode', 'HistogramNode',
            'IdentityNode', '_OneDimensionalHitParade',
             'MovingAvgNode', 'MovingTimeDiffNode', 'CCIPCANode', 'CCIPCAWhiteningNode', 'MCANode',
-           'IncSFANode', 'HSFANode', 'HSFAPoolNode'
+           'IncSFANode', 'HSFANode', 'HSFAPoolNode', 'NumxBufferNode'
            ]
 
 
@@ -79,6 +79,11 @@ if config.has_sklearn:
             globals()[name] = scikits_nodes.DICT_[name]
             __all__.append(name)
         del name
+
+if config.has_pyqtgraph:
+    from .pg_nodes import PG2DNode, PGCurveNode, PGImageNode
+    __all__+= ['PG2DNode', 'PGCurveNode', 'PGImageNode']
+
 
 from mdp import utils
 utils.fixup_namespace(__name__, __all__ + ['ICANode'],
@@ -112,5 +117,6 @@ utils.fixup_namespace(__name__, __all__ + ['ICANode'],
                        'pca_nodes_online',
                        'mca_nodes_online',
                        'sfa_nodes_online',
-                       'hsfa_nodes'
+                       'hsfa_nodes',
+                       'pg_nodes'
                         ))

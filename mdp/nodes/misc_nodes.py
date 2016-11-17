@@ -14,6 +14,37 @@ from mdp import numx, utils, Node, NodeException, PreserveDimNode
 import pickle as pickle
 import pickle as real_pickle
 
+class NumxBufferNode(mdp.Node):
+    def __init__(self, buffer_size, input_dim=None, output_dim=None, dtype=None):
+        super(NumxBufferNode, self).__init__(input_dim, output_dim, dtype)
+        self._buffer_size = buffer_size
+        self._buffer = None
+
+    def _check_input(self, x):
+        super(NumxBufferNode, self)._check_input(x)
+        if self._buffer is None:
+            self._buffer = mdp.numx.zeros((self._buffer_size, self.input_dim))
+
+    def _get_supported_dtypes(self):
+        return mdp.utils.get_dtypes('AllInteger') + mdp.utils.get_dtypes('Float')
+
+    @staticmethod
+    def is_trainable():
+        return False
+
+    @staticmethod
+    def is_invertible():
+        return False
+
+    def _execute(self, x):
+        if x.shape[0] > self._buffer_size:
+            self._buffer = x[-self._buffer_size:].copy()
+        else:
+            self._buffer = mdp.numx.roll(self._buffer, -x.shape[0], axis=0)
+            self._buffer[-x.shape[0]:] = x.copy()
+        return self._buffer.copy()
+
+
 class IdentityNode(PreserveDimNode):
     """Execute returns the input data and the node is not trainable.
 
