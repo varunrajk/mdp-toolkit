@@ -7,7 +7,41 @@ from pyqtgraph.Qt import QtGui, QtCore
 from multiprocessing import Process, Queue
 
 class PG2DNode(mdp.Node):
+    """ PG2DNode is a non-blocking fast online 2D plotting node. It uses
+    the fast plotting python library called the PyQtGraph (http://www.pyqtgraph.org/).
+
+    PG2DNode is a non-trainable node. It works similar to an oscilloscope;
+    place it between two OnlineNodes in an OnlineFlow to visualize the data being
+    passed between the nodes. The node can also be used standalone, that is it plots
+    as soon as new data is passed through the execute call.
+
+    PG2DNodes 'subclasses' should take care of overwriting these functions
+    '_setup_plots', '_update_plots'. Check PGCurveNode and PGImageNode as examples.
+    Care must be taken to not overwrite methods '__pg_process', '__pg_data' and
+    '__plot' in a subclass unless really required.
+
+    PG2DNodes also work like an identity node returning the input as the output.
+    When the plotting windows are manually closed, the node continues to transmit input
+    as the output without interfering the flow.
+
+    """
+
     def __init__(self, use_buffer=False, x_range=None, y_range=None, interval=1, input_dim=None, output_dim=None, dtype=None):
+        """
+        user_buffer: If the data arrives sample by sample (like in an OnlineFlow), use_buffer can be set to store
+        samples in a circular buffer. At each time-step the buffer contents are displayed.
+
+        x_range: Denotes the range of x-axis values to be shown. When the use_buffer is set, this also denotes the size of
+        the buffer.
+
+        y_range: y-axis range
+
+        interval: Time steps after which the plots are updated. Here, time step refers to the execute call count.
+                 1 - Plots are updated after each execute call
+                 10 - Plots are updated after every 10th execute call
+                 -1 - Automatically optimize the interval such that the plot updates do not slow the flow's execution time.
+
+         """
         super(PG2DNode, self).__init__(input_dim, output_dim, dtype)
         self.use_buffer = use_buffer
         self._x_range = x_range
@@ -59,38 +93,33 @@ class PG2DNode(mdp.Node):
 
     def _check_input(self, x):
         super(PG2DNode, self)._check_input(x)
-        if self._viewer == None:
-            self._viewer = Process(target=self._pg_process)
+        if self._viewer is None:
+            self._viewer = Process(target=self.__pg_process)
             self._viewer.start()
 
-    def _pg_process(self):
+    # -------------------------------------------
+    # super private methods.
+    # Do not overwrite unless you know what you are doing.
+    def __pg_process(self):
+        # spawned process
         self.app = QtGui.QApplication([])
-        self._setup_pg_plots()
+        self._setup_plots()
         self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(self._pg_data)
+        self.timer.timeout.connect(self.__pg_data)
         self.timer.start()
         self.app.exec_()
 
-    def _pg_data(self):
+    def __pg_data(self):
+        # communication function
         if not self.new_data.empty():
             data = self.new_data.get()
-            if data == None:
+            if data is None:
                 QtGui.QApplication.closeAllWindows()
                 return
-            self._update_pg_plots(data)
+            self._update_plots(data)
 
-    def _setup_pg_plots(self):
-        raise mdp.NodeException('Not implemented in the base class!')
-
-    def _update_pg_plots(self, x):
-        raise mdp.NodeException('Not implemented in the base class!')
-
-    def close(self):
-        self.new_data.put(None)
-        self._viewer.join()
-        return
-
-    def _plot(self, x):
+    def __plot(self, x):
+        # plot given data
         if not self._viewer.is_alive(): return
         while(self.new_data.full()):
             if not self._viewer.is_alive():
@@ -98,6 +127,19 @@ class PG2DNode(mdp.Node):
                 return
             time.sleep(0.0001)
         self.new_data.put(x)
+    # -------------------------------------------
+
+    def _setup_plots(self):
+        # Setup your plots, layout, etc. Overwrite in the subclass
+        # Check PyQtGraph for examples
+        # run in shell prompt: python -c "import pyqtgraph.examples; pyqtgraph.examples.run()"
+        self._win = pg.GraphicsWindow()
+        self._win.show()
+        self._win.setWindowTitle("Blank Plot")
+
+    def _update_plots(self, x):
+        # Update your individual plotitems. Overwrite in the subclass
+        pass
 
     def _execute(self, x):
         self._tlen+=1
@@ -107,7 +149,7 @@ class PG2DNode(mdp.Node):
             y = self._buffer(x)
         if self._tlen % int(self._interval) == 0:
             t = time.time()
-            self._plot(y)
+            self.__plot(y)
             _plot_dur = time.time()-t
             if self.interval == -1:
                 self._interval = self._interval*(100*_plot_dur/_flow_dur + (self._tlen/self._interval-1)*self._interval)/float(self._tlen)
@@ -115,16 +157,39 @@ class PG2DNode(mdp.Node):
         self._flow_time = time.time()
         return x
 
+    def close(self):
+        # Force close all the plots.
+        # This is usually not required as the process terminates if the
+        # windows are manually closed.
+        if not self.new_data.empty():
+            self.new_data.get()
+        self.new_data.put(None)
+        self._viewer.join()
+        return
+
+
 class PGCurveNode(PG2DNode):
-    def __init__(self, title=None, plot_size=(640,480), split_figs=False, use_buffer=False, x_range=None, y_range=None, interval=1):
+    """ PGCurveNode is a PG2DNode that displays the input data as multiple curves.
+        Use_buffer needs to be set if the data arrives sample by sample.
+    """
+    def __init__(self, title=None, plot_size_xy=(640,480), split_figs=False, use_buffer=False, x_range=None, y_range=None, interval=1):
+        """
+        title: Window title
+
+        plot_size_xy: Plot size (x,y) tuple
+
+        split_figs: When set, each data dimension is plotted in a separate figure, otherwise they are vertically stacked
+        in a single plot.
+
+         """
         super(PGCurveNode, self).__init__(use_buffer, x_range, y_range, interval)
         self.title = title
-        self.plot_size = plot_size
+        self.plot_size_xy = plot_size_xy
         self.split_figs = split_figs
 
-    def _setup_pg_plots(self):
+    def _setup_plots(self):
         self._win = pg.GraphicsWindow()
-        self._win.resize(*self.plot_size)
+        self._win.resize(*self.plot_size_xy)
         self._win.show()
         if self.title is not None:
             self._win.setWindowTitle(self.title)
@@ -163,18 +228,34 @@ class PGCurveNode(PG2DNode):
 
             self._layout.addItem(self._plotitems)
 
-    def _update_pg_plots(self, x):
+    def _update_plots(self, x):
         for i in xrange(self.input_dim):
             self._curves[i].setData(x[:, i])
 
 
 class PGImageNode(PG2DNode):
-    def __init__(self, img_xy, title=None, plot_size=None, lut=None, interval=1):
+    """ PGImageNode is a PG2DNode that displays the input data as an Image.
+        use_buffer is forcefully unset as it is not required.
+    """
+    def __init__(self, img_xy, title=None, plot_size_xy=None, cmap=None, interval=1):
+        """
+        img_xy: Tuple of x and y dimensions of the image. Used to reshape the 2D data.
+        
+        title: Window title
+
+        plot_size_xy: Plot size (x,y) tuple
+
+        cmap: color map to use. Supported: Matplotlib color maps - 'jet', 'gray', etc.
+
+         """
         super(PGImageNode, self).__init__(use_buffer=False, x_range=None, y_range=None, interval=interval)
         self.img_xy = img_xy
         self.title = title
-        self.plot_size = plot_size
-        self.lut = lut
+        self.plot_size_xy = plot_size_xy
+        self.cmap = cmap
+
+        # Force unset use_buffer
+        self.use_buffer = False
 
     @staticmethod
     def _get_pglut(lutname=None):
@@ -191,10 +272,10 @@ class PGImageNode(PG2DNode):
             pg_lut[0, :] = [0, 0, 0]
         return pg_lut
 
-    def _setup_pg_plots(self):
+    def _setup_plots(self):
         self._win = pg.GraphicsWindow()
-        if self.plot_size is not None:
-            self._win.resize(*self.plot_size)
+        if self.plot_size_xy is not None:
+            self._win.resize(*self.plot_size_xy)
         self._win.show()
         if self.title is not None:
             self._win.setWindowTitle(self.title)
@@ -207,7 +288,7 @@ class PGImageNode(PG2DNode):
         # Set the layout as a central item
         self._win.setCentralItem(self._plotitem)
 
-        self._img = pg.ImageItem(border='w', lut=self._get_pglut(self.lut))
+        self._img = pg.ImageItem(border='w', lut=self._get_pglut(self.cmap))
 
         self._plotitem.addItem(self._img)
 
@@ -217,11 +298,11 @@ class PGImageNode(PG2DNode):
         self._plotitem.hideAxis('top')
         self._plotitem.hideAxis('right')
 
-    def _pre_execution_checks(self, x):
-        super(PGImageNode, self)._pre_execution_checks(x)
-        if x.shape[0] > 1:
-            raise mdp.NodeException("x.ndim should be 1, given %d."%(x.shape[0]))
-
-    def _update_pg_plots(self, x):
+    def _update_plots(self, x):
         x = x.reshape(self.img_xy[0], self.img_xy[1], x.shape[1]/(self.img_xy[0]*self.img_xy[1]))
         self._img.setImage(x)
+
+    def _execute(self, x):
+        for i in xrange(x.shape[0]):
+            super(PGImageNode, self)._execute(x[i:i+1])
+        return x
