@@ -51,6 +51,8 @@ class OnlineFlow(mdp.Flow):
         self._check_compatibilitiy(flow)
         # collect cache from individual nodes.
         self._cache = self._get_cache_from_flow(flow)
+        # collect train_args for each node
+        self._train_arg_keys_list, self._train_args_needed_list = self._get_required_train_args_from_flow(flow)
 
     @property
     def cache(self):
@@ -60,39 +62,48 @@ class OnlineFlow(mdp.Flow):
         err_str = ('Not used in %s'%str(type(self).__name__))
         FlowException(err_str)
 
-    def _train_nodes(self, data_iterables):
-        train_arg_keys_list = [self._get_required_train_args(node) for node in self.flow]
-        train_args_needed_list = [bool(len(train_arg_keys)) for train_arg_keys in train_arg_keys_list]
+    def _get_required_train_args_from_flow(self, flow):
+        _train_arg_keys_list = [self._get_required_train_args(node) for node in flow]
+        _train_args_needed_list = [bool(len(train_arg_keys)) for train_arg_keys in _train_arg_keys_list]
+        return _train_arg_keys_list, _train_args_needed_list
 
+    def _train_nodes(self, data_iterables):
         empty_iterator = True
         for x in data_iterables:
+            if (type(x) is tuple) or (type(x) is list):
+                args = x[1:]
+                x = x[0]
+                if len(args) != len(self.flow):
+                    err = ("Wrong number of argument-tuples provided by " +
+                           "the iterable (%d needed, %d given).\n" %(len(self.flow), len(args)))
+                    raise FlowException(err)
+            else:
+                args = ()
             empty_iterator = False
             for nodenr in xrange(len(self.flow)):
-                # the nodenr'th arguments tuple following the first are passed only to the
-                # currently trained node, allowing the implementation of
-                # supervised nodes
-                if (type(x) is tuple) or (type(x) is list):
-                    x = x[0]
-                    if nodenr >= len(x[1:]):
-                        arg = ()
-                    else:
-                        arg = x[1:][nodenr]
-                else:
-                    arg = ()
                 try:
                     node = self.flow[nodenr]
                     # check if the required number of arguments was given
-                    if train_args_needed_list[nodenr]:
-                        if len(train_arg_keys_list[nodenr]) != len(arg):
+                    if self._train_args_needed_list[nodenr]:
+                        # the nodenr'th arguments tuple are passed only to the
+                        # currently training node, allowing the implementation of
+                        # supervised nodes
+                        arg = args[nodenr]
+
+                        if len(self._train_arg_keys_list[nodenr]) != len(arg):
                             err = ("Wrong number of arguments provided by " +
                                    "the iterable for node #%d " % nodenr +
                                    "(%d needed, %d given).\n" %
-                                   (len(train_arg_keys_list[nodenr]), len(arg)) +
+                                   (len(self._train_arg_keys_list[nodenr]), len(arg)) +
                                    "List of required argument keys: " +
-                                   str(train_arg_keys_list[nodenr]))
+                                   str(self._train_arg_keys_list[nodenr]))
                             raise FlowException(err)
-                    if node.is_training():
-                        node.train(x, *arg)
+                        if node.is_training():
+                            node.train(x, *arg)
+                    else:
+                        if node.is_training():
+                            node.train(x)
+
                     # input for the next node
                     x = node.execute(x)
                 except FlowExceptionCR as e:
@@ -151,19 +162,27 @@ class OnlineFlow(mdp.Flow):
     def train(self, data_iterables):
         """Train all trainable nodes in the flow.
 
-        'data_iterable' is an iterable (including generator-type  iterators) that
-         must return data arrays to train nodes (so the data arrays are the 'x'
-         for the nodes). Note that the data arrays are processed by the nodes
-         which are in front of the node that gets trained,
-         so the data dimension must match the input dimension of the first node.
+        'data_iterables' is an iterable (including generator-type  iterators if
+        the last node has no multiple training phases) that must return data
+        arrays to train nodes (so the data arrays are the 'x' for the nodes).
+        Note that the data arrays are processed by the nodes
+        which are in front of the node that gets trained,
+        so the data dimension must match the input dimension of the first node.
 
-        Instead of a data array 'x' the iterator can also return a list or
-        tuple, where the first entry is 'x' and the following are args for
-        training all the node (e.g. for supervised training). eg.:
+        data_iterables can also be a 2D or a 3D numpy array. A 2D array trains
+        all the nodes incrementally, while a 3D array supports online training
+        in batches (=shape[1]).
 
-        (x,(node0 args), (node1 args))  - only args for the first two nodes are given
+        data_iterables can also return a list or a tuple, where the first entry is
+        'x' and the following are the required args for training all the nodes in
+        the flow (e.g. for supervised training).
 
-        (x, (node0 args), (None), (node2 args))  - args for the first and third nodes are given
+        (x, (node-0 args), (node-1 args), ..., (node-n args)) - args for n nodes
+
+        if say node-i does not require any args, the provided (node-i args) are ignored.
+        So, one can simply use None for the nodes that do not require args.
+
+        (x, (node-0 args), ..., None, ..., (node-n args)) - None args for the ith node.
 
         """
 
@@ -219,6 +238,7 @@ class OnlineFlow(mdp.Flow):
         # if no exception was raised, accept the new sequence
         self.flow = flow_copy
         self._cache = self._get_cache_from_flow(flow_copy)
+        self._train_arg_keys_list, self._train_args_needed_list = self._get_required_train_args_from_flow(flow_copy)
 
     def __delitem__(self, key):
         # make a copy of list
@@ -230,6 +250,7 @@ class OnlineFlow(mdp.Flow):
         # if no exception was raised, accept the new sequence
         self.flow = flow_copy
         self._cache = self._get_cache_from_flow(flow_copy)
+        self._train_arg_keys_list, self._train_args_needed_list = self._get_required_train_args_from_flow(flow_copy)
 
     def __add__(self, other):
         # append other to self
@@ -268,6 +289,7 @@ class OnlineFlow(mdp.Flow):
         self._check_compatibilitiy(self.flow)
         self._check_nodes_consistency(self.flow)
         self._cache = self._get_cache_from_flow(self.flow)
+        self._train_arg_keys_list, self._train_args_needed_list = self._get_required_train_args_from_flow(self.flow)
         return self
 
     ###### public container methods
@@ -278,6 +300,7 @@ class OnlineFlow(mdp.Flow):
         self._check_nodes_consistency(self.flow)
         self._check_compatibilitiy(self.flow)
         self._cache = self._get_cache_from_flow(self.flow)
+        self._train_arg_keys_list, self._train_args_needed_list = self._get_required_train_args_from_flow(self.flow)
 
     def extend(self, x):
         """flow.extend(iterable) -- extend flow by appending
@@ -290,6 +313,7 @@ class OnlineFlow(mdp.Flow):
         self._check_nodes_consistency(self.flow)
         self._check_compatibilitiy(self.flow)
         self._cache = self._get_cache_from_flow(self.flow)
+        self._train_arg_keys_list, self._train_args_needed_list = self._get_required_train_args_from_flow(self.flow)
 
     def insert(self, i, x):
         """flow.insert(index, node) -- insert node before index"""
@@ -297,6 +321,7 @@ class OnlineFlow(mdp.Flow):
         self._check_nodes_consistency(self.flow)
         self._check_compatibilitiy(self.flow)
         self._cache = self._get_cache_from_flow(self.flow)
+        self._train_arg_keys_list, self._train_args_needed_list = self._get_required_train_args_from_flow(self.flow)
 
 
 

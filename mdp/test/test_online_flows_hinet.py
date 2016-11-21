@@ -37,6 +37,13 @@ class BogusOnlineDiffDimNode(mdp.OnlineNode):
     @staticmethod
     def is_invertible(): return False
 
+class BogusOnlineNodeWithTrainArgs(mdp.OnlineNode):
+    def _check_params(self, x):
+        if not hasattr(self, 'sum'): self.sum = mdp.numx.zeros((1,self.input_dim))
+    def _train(self, x, a, b): self.sum += x
+    def _execute(self,x): return x + 1
+    def _inverse(self,x): return x - 1
+
 def _get_default_flow(flow_class=OnlineFlow, node_class=BogusOnlineNode):
     flow = flow_class([node_class(),node_class(),node_class()])
     return flow
@@ -237,6 +244,35 @@ def test_flow_container_listmethods():
         raise Exception('flow.pop left inconsistent flow')
     except ValueError:
         assert_equal(len(flow), length)
+
+
+def test_flow_train_args():
+    #check args len
+    flow = _get_default_flow(node_class=BogusOnlineNodeWithTrainArgs)
+    _args_needed = flow._train_args_needed_list
+    _keys = flow._train_arg_keys_list
+    assert(mdp.numx.all(_args_needed))
+    for val in _keys:
+        assert(len(val) == 2)
+    flow = _get_default_flow()
+    _args_needed = flow._train_args_needed_list
+    _keys = flow._train_arg_keys_list
+    assert (not mdp.numx.all(_args_needed))
+    for val in _keys:
+        assert (len(val) == 0)
+
+    # train with args
+    flow = _get_default_flow(node_class=BogusOnlineNodeWithTrainArgs)
+    flow[-2] = BogusOnlineNode()
+
+    inp = numx.ones((1,3))*2
+    x = [(inp, (1,2), None, (3,4))]
+    flow.train(x)
+    out = flow(inp)
+    [assert_array_equal(f.sum,i+inp)  for i,f in enumerate(flow)]
+    assert_array_equal(out,len(flow)+inp)
+    rec = flow.inverse(out)
+    assert_array_equal(rec,inp)
 
 
 def test_executable_flow_node():
