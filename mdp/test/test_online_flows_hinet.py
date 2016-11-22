@@ -1,7 +1,7 @@
 
 from ._tools import *
 from mdp import numx
-from mdp import OnlineFlow
+from mdp import OnlineFlow, CircularOnlineFlow
 
 
 from future import standard_library
@@ -21,7 +21,7 @@ class BogusOnlineNode(mdp.OnlineNode):
     def _execute(self,x): return x + 1
     def _inverse(self,x): return x - 1
 
-class BogusOnlineNode1(mdp.OnlineNode):
+class BogusOnlineNodeReturnSum(mdp.OnlineNode):
     def _check_params(self, x):
         if not hasattr(self, 'sum'): self.sum = mdp.numx.zeros((1,self.input_dim))
     def _train(self, x): self.sum += x
@@ -273,6 +273,37 @@ def test_flow_train_args():
     assert_array_equal(out,len(flow)+inp)
     rec = flow.inverse(out)
     assert_array_equal(rec,inp)
+
+
+def test_circular_flow():
+    flow = CircularOnlineFlow([BogusNode(input_dim=2, output_dim=2),
+                        BogusOnlineDiffDimNode(input_dim=2, output_dim=4),
+                        BogusNode(input_dim=4, output_dim=4),
+                        BogusOnlineDiffDimNode(input_dim=4, output_dim=2)])
+
+    for inp_node_idx in xrange(len(flow)):
+        flow.set_input_node(inp_node_idx)
+        for out_node_idx in xrange(len(flow)):
+            flow.set_output_node(out_node_idx)
+            inp = numx.ones((1, flow[0].input_dim))
+            flow.train(inp)
+            out = flow(inp)
+            assert(out.shape[1] == flow[out_node_idx].output_dim)
+            assert(flow.get_stored_input().shape[1] == flow[3].output_dim)
+
+    flow = CircularOnlineFlow([BogusNode(),
+                                    BogusOnlineNodeReturnSum(),
+                                    BogusNode(),
+                                    BogusOnlineNodeReturnSum()])
+
+    inp = numx.ones((1, 2))
+    flow.train(inp)
+    out = flow(inp)
+
+    assert_array_equal(out, inp*4)
+    flow.train(2)
+    out = flow(inp)
+    assert_array_equal(out, inp*140)
 
 
 def test_executable_flow_node():

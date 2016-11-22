@@ -148,7 +148,7 @@ from .signal_node_online import OnlineNode, PreserveDimOnlineNode
 from .linear_flows import (Flow, CheckpointFlow,
                           CheckpointFunction, CheckpointSaveFunction)
 
-from .linear_flows_online import OnlineFlow
+from .linear_flows_online import OnlineFlow, CircularOnlineFlow
 
 # import helper functions:
 from .helper_funcs import pca, fastica
@@ -188,6 +188,7 @@ __all__ = ['config',
            'FlowException',
            'FlowExceptionCR',
            'OnlineFlow',
+           'CircularOnlineFlow',
            'IsNotInvertibleException',
            'IsNotTrainableException',
            'MDPException',
