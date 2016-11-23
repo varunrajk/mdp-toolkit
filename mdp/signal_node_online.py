@@ -197,8 +197,8 @@ class OnlineNode(Node):
             raise TrainingFinishedException(err_str)
 
         self._check_input(x)
-        self._check_params(x)
         self._check_train_args(x, *args, **kwargs)
+        self._check_params(x)
 
         x = self._refcast(x)
         self._train_phase_started = True
