@@ -70,7 +70,7 @@ class IncSFANode(mdp.OnlineNode):
         if remove_mean:
             self.avgnode = MovingAvgNode(numx_rng=numx_rng, avg_n=avg_n)
 
-        self._new_episode = True
+        self._new_episode = None
 
         self._init_sf = None
         self.wv = None
@@ -78,14 +78,6 @@ class IncSFANode(mdp.OnlineNode):
 
         # cache to store variables
         self._cache = {'slow_features': None, 'whitening_vectors': None, 'weight_change': None}
-
-    @property
-    def new_episode(self):
-        return self._new_episode
-
-    @new_episode.setter
-    def new_episode(self, flag):
-        self._new_episode = flag
 
     @property
     def init_slow_features(self):
@@ -115,6 +107,11 @@ class IncSFANode(mdp.OnlineNode):
             self._init_sf = mult(self.whiteningnode.init_eigen_vectors,self.mcanode.init_eigen_vectors)
             self.sf = self._init_sf
 
+        if self._new_episode is None:         # Set new_episode to True for the very first sample
+            self._new_episode = True
+        elif self._new_episode:               # Set new_episode to False for the subsequent samples
+            self._new_episode = False
+
     def _pseudo_check_fn(self, node, x):
         node._check_input(x)
         node._check_params(x)
@@ -123,7 +120,10 @@ class IncSFANode(mdp.OnlineNode):
         node._train(x)
         node._train_iteration+=x.shape[0]
 
-    def _train(self, x):
+    def _train(self, x, new_episode=None):
+        if new_episode is not None:
+            self._new_episode = new_episode
+
         if self.remove_mean:
             self._pseudo_train_fn(self.avgnode, x)
             x = self.avgnode._execute(x)
@@ -133,8 +133,7 @@ class IncSFANode(mdp.OnlineNode):
 
         self._pseudo_train_fn(self.tdiffnode, x)
 
-        if self.new_episode:
-            self.new_episode = False
+        if self._new_episode:
             return
 
         x = self.tdiffnode._execute(x)
