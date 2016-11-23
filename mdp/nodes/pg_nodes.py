@@ -97,6 +97,9 @@ class PG2DNode(mdp.Node):
             self._viewer = Process(target=self.__pg_process)
             self._viewer.start()
 
+    def _get_supported_dtypes(self):
+        return mdp.utils.get_dtypes('AllInteger') + mdp.utils.get_dtypes('Float')
+
     # -------------------------------------------
     # super private methods.
     # Do not overwrite unless you know what you are doing.
@@ -237,7 +240,7 @@ class PGImageNode(PG2DNode):
     """ PGImageNode is a PG2DNode that displays the input data as an Image.
         use_buffer is forcefully unset as it is not required.
     """
-    def __init__(self, img_xy, title=None, plot_size_xy=None, cmap=None, interval=1):
+    def __init__(self, img_xy, title=None, plot_size_xy=None, cmap=None, origin='upper', axis_order='row-major', interval=1):
         """
         img_xy: Tuple of x and y dimensions of the image. Used to reshape the 2D data.
         
@@ -245,14 +248,29 @@ class PGImageNode(PG2DNode):
 
         plot_size_xy: Plot size (x,y) tuple
 
-        cmap: color map to use. Supported: Matplotlib color maps - 'jet', 'gray', etc.
+        cmap: Color map to use. Supported: Matplotlib color maps - 'jet', 'gray', etc.
+
+        origin: The origin is set at the upper left hand corner and rows (first dimension of the array)
+                are displayed horizontally. It can also be set to 'lower' if you want the first
+                row in the array to be at the bottom instead of the top.
+
+        axis_order: Axis order can either be 'row-major' or 'col-major'. For 'row-major', image data is expected
+                    in the standard (row, col) order. For 'col-major', image data is expected in reversed (col, row) order.
 
          """
         super(PGImageNode, self).__init__(use_buffer=False, x_range=None, y_range=None, interval=interval)
         self.img_xy = img_xy
         self.title = title
-        self.plot_size_xy = plot_size_xy
+        self.plot_size_xy = self.img_xy if plot_size_xy is None else plot_size_xy
+
         self.cmap = cmap
+        if origin not in ['upper', 'lower']:
+            raise mdp.NodeException("'origin' must either be 'upper' or 'lower' and not %s"%str(origin))
+        self.origin = origin
+
+        if axis_order not in ['row-major', 'col-major']:
+            raise mdp.NodeException("'axis_order' must either be 'row-major' or 'col-major' and not %s"%str(axis_order))
+        self.axis_order = axis_order
 
         # Force unset use_buffer
         self.use_buffer = False
@@ -274,13 +292,13 @@ class PGImageNode(PG2DNode):
 
     def _setup_plots(self):
         self._win = pg.GraphicsWindow()
-        if self.plot_size_xy is not None:
-            self._win.resize(*self.plot_size_xy)
+        self._win.resize(*self.plot_size_xy)
         self._win.show()
         if self.title is not None:
             self._win.setWindowTitle(self.title)
 
         pg.setConfigOptions(antialias=True)
+        pg.setConfigOptions(imageAxisOrder=self.axis_order)
 
         # Main layout
         self._plotitem = pg.PlotItem()
@@ -300,6 +318,12 @@ class PGImageNode(PG2DNode):
 
     def _update_plots(self, x):
         x = x.reshape(self.img_xy[0], self.img_xy[1], x.shape[1]/(self.img_xy[0]*self.img_xy[1]))
+        x = x.squeeze()
+        if self.origin == "upper":
+            if (self.axis_order == 'row-major'):
+                x = x[::-1]
+            elif (self.axis_order == 'col-major'):
+                x = x[:,::-1]
         self._img.setImage(x)
 
     def _execute(self, x):
