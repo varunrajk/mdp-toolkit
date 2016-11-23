@@ -69,6 +69,8 @@ class OnlineNode(Node):
         # this variable can be set using set_training_type() method.
         self._training_type = 'incremental'
 
+    ### properties in addition to the Node properties
+
     def get_numx_rng(self):
         """Return input dimensions."""
         return self._numx_rng
@@ -97,10 +99,6 @@ class OnlineNode(Node):
 
     cache = property(get_cache, doc="Internal cache dict")
 
-    def get_current_train_iteration(self):
-        """Return the index of the current training iteration."""
-        return self._train_iteration
-
     @property
     def training_type(self):
         """Training type (Read only)"""
@@ -115,6 +113,14 @@ class OnlineNode(Node):
             self._training_type = training_type
         else:
             raise NodeException("Unknown training type specified %s. Supported types ['incremental', 'batch']"%(training_type))
+
+    ### additional OnlineNode states
+
+    def get_current_train_iteration(self):
+        """Return the index of the current training iteration."""
+        return self._train_iteration
+
+    ### check functions
 
     def _pre_execution_checks(self, x):
         """This method contains all pre-execution checks.
@@ -146,10 +152,6 @@ class OnlineNode(Node):
         # control the dimension of y
         self._check_output(y)
 
-    def _check_params(self, x):
-        # set in the subclass
-        pass
-
     def _check_input(self, x):
         super(OnlineNode, self)._check_input(x)
 
@@ -161,6 +163,15 @@ class OnlineNode(Node):
         if self.numx_rng is None:
             self.numx_rng = mdp.numx_rand.RandomState()
 
+    ### Additional methods to be implemented by the user
+
+    # these are the methods the user has to overwrite
+    # they receive the data already casted to the correct type
+
+    def _check_params(self, x):
+        pass
+
+    ### User interface to the overwritten methods
 
     def train(self, x, *args, **kwargs):
         """Update the internal structures according to the input data `x`.
@@ -225,6 +236,8 @@ class OnlineNode(Node):
         if self.get_remaining_train_phase() == 0:
             self._training = False
 
+    ###### adding nodes returns flows and not OnlineFlows
+
     def __add__(self, other):
         # check other is a node
         if isinstance(other, OnlineNode):
@@ -238,6 +251,7 @@ class OnlineNode(Node):
                        ' (not \'%s\') to node' % (type(other).__name__))
             raise TypeError(err_str)
 
+    ###### string representation
 
     def __repr__(self):
         # print input_dim, output_dim, dtype and numx_rng
