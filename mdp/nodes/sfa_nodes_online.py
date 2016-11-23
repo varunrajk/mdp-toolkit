@@ -91,10 +91,6 @@ class IncSFANode(mdp.OnlineNode):
     def init_mca_vectors(self):
         return self.mcanode.init_eigen_vectors
 
-    def set_training_type(self, training_type):
-        if training_type != 'incremental':
-            _warn.warn("Cannot set training type to %s. Only 'incremental' is supported"%(training_type))
-
     def _check_params(self, x):
         if self._init_sf is None:
             if self.remove_mean:
@@ -120,10 +116,13 @@ class IncSFANode(mdp.OnlineNode):
         node._train(x)
         node._train_iteration+=x.shape[0]
 
-    def _train(self, x, new_episode=None):
-        if new_episode is not None:
-            self._new_episode = new_episode
+    def _check_train_args(self, x, *args, **kwargs):
+        if self.training_type is 'batch':
+            # check that we have at least 2 time samples for batch training
+            if  x.shape[0] < 2:
+                raise mdp.TrainingException("Need at least 2 time samples for 'batch' training type (%d given)"%(x.shape[0]))
 
+    def _step_train(self, x):
         if self.remove_mean:
             self._pseudo_train_fn(self.avgnode, x)
             x = self.avgnode._execute(x)
@@ -143,6 +142,18 @@ class IncSFANode(mdp.OnlineNode):
         sf = mult(self.whiteningnode.v,self.mcanode.v)
         sf_change = mdp.numx_linalg.norm(sf - self.sf)
         self.sf = sf
+        return sf_change
+
+    def _train(self, x, new_episode=None):
+        if self.training_type == 'batch':
+            self._new_episode = True
+            for i in xrange(x.shape[0]):
+                sf_change = self._step_train(x[i:i+1])
+                self._new_episode = False
+        else:
+            if new_episode is not None:
+                self._new_episode = new_episode
+            sf_change = self._step_train(x)
 
         self.cache['slow_features'] = self.sf.copy()
         self.cache['whitening_vectors'] = self.whiteningnode.cache['eigen_vectors']
@@ -152,7 +163,6 @@ class IncSFANode(mdp.OnlineNode):
         if self.remove_mean:
             x = self.avgnode._execute(x)
         return mult(x, self.sf)
-
 
     def __repr__(self):
         # print all args
