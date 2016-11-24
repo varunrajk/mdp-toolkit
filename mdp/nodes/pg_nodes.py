@@ -6,7 +6,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
 from multiprocessing import Process, Queue
 
-class PG2DNode(mdp.Node):
+class PG2DNode(mdp.PreserveDimNode):
     """ PG2DNode is a non-blocking fast online 2D plotting node. It uses
     the fast plotting python library called the PyQtGraph (http://www.pyqtgraph.org/).
 
@@ -17,7 +17,7 @@ class PG2DNode(mdp.Node):
 
     PG2DNodes 'subclasses' should take care of overwriting these functions
     '_setup_plots', '_update_plots'. Check PGCurveNode and PGImageNode as examples.
-    Care must be taken to not overwrite methods '__pg_process', '__pg_data' and
+    Care must be taken to not overwrite methods '_check_input', '__pg_process', '__pg_data' and
     '__plot' in a subclass unless really required.
 
     PG2DNodes also work like an identity node returning the input as the output.
@@ -59,6 +59,8 @@ class PG2DNode(mdp.Node):
 
         self.new_data = Queue(1)
 
+    ### properties
+
     def get_x_range(self):
         return self._x_range
 
@@ -91,18 +93,19 @@ class PG2DNode(mdp.Node):
     def is_trainable():
         return False
 
-    def _check_input(self, x):
-        super(PG2DNode, self)._check_input(x)
-        if self._viewer is None:
-            self._viewer = Process(target=self.__pg_process)
-            self._viewer.start()
-
     def _get_supported_dtypes(self):
         return mdp.utils.get_dtypes('AllInteger') + mdp.utils.get_dtypes('Float')
 
     # -------------------------------------------
     # super private methods.
     # Do not overwrite unless you know what you are doing.
+
+    def _check_input(self, x):
+        super(PG2DNode, self)._check_input(x)
+        if self._viewer is None:
+            self._viewer = Process(target=self.__pg_process)
+            self._viewer.start()
+
     def __pg_process(self):
         # spawned process
         self.app = QtGui.QApplication([])
@@ -175,7 +178,7 @@ class PGCurveNode(PG2DNode):
     """ PGCurveNode is a PG2DNode that displays the input data as multiple curves.
         Use_buffer needs to be set if the data arrives sample by sample.
     """
-    def __init__(self, title=None, plot_size_xy=(640,480), split_figs=False, use_buffer=False, x_range=None, y_range=None, interval=1):
+    def __init__(self, title=None, plot_size_xy=(640,480), split_figs=False, display_dims=None, use_buffer=False, x_range=None, y_range=None, interval=1):
         """
         title: Window title
 
@@ -184,18 +187,27 @@ class PGCurveNode(PG2DNode):
         split_figs: When set, each data dimension is plotted in a separate figure, otherwise they are vertically stacked
         in a single plot.
 
+        display_dims: Dimensions that are displayed in the plots. By default all dimensions are displayed. Accepted values:
+                      scalar/list/array - displays the provided dimensions
+
          """
         super(PGCurveNode, self).__init__(use_buffer, x_range, y_range, interval)
-        self.title = title
-        self.plot_size_xy = plot_size_xy
-        self.split_figs = split_figs
+        self._title = title
+        self._plot_size_xy= plot_size_xy
+        self._split_figs = split_figs
+
+        if display_dims is not None:
+            if mdp.numx.isscalar(display_dims):
+                display_dims = [display_dims]
+            display_dims = mdp.numx.asarray(display_dims)
+        self._display_dims = display_dims
 
     def _setup_plots(self):
         self._win = pg.GraphicsWindow()
-        self._win.resize(*self.plot_size_xy)
+        self._win.resize(*self._plot_size_xy)
         self._win.show()
-        if self.title is not None:
-            self._win.setWindowTitle(self.title)
+        if self._title is not None:
+            self._win.setWindowTitle(self._title)
 
         pg.setConfigOptions(antialias=True)
 
@@ -205,11 +217,16 @@ class PGCurveNode(PG2DNode):
         # Set the layout as a central item
         self._win.setCentralItem(self._layout)
 
-        self._curves = [pg.PlotCurveItem(pen=(i,self.input_dim*1.3)) for i in xrange(self.input_dim)]
-        self._plotitems = [pg.PlotItem() for _ in xrange(self.input_dim)]
-        if self.split_figs:
-            num_rows = int(mdp.numx.sqrt(self.input_dim))+1
-            for i in xrange(self.input_dim):
+        if self._display_dims is None:
+            self._display_dims = range(0,self.input_dim)
+
+        n_disp_dims = len(self._display_dims)
+
+        self._curves = [pg.PlotCurveItem(pen=(i,n_disp_dims*1.3)) for i in xrange(n_disp_dims)]
+        self._plotitems = [pg.PlotItem() for _ in xrange(n_disp_dims)]
+        if self._split_figs:
+            num_rows = mdp.numx.ceil(mdp.numx.sqrt(n_disp_dims))
+            for i in xrange(n_disp_dims):
                 self._plotitems[i].addItem(self._curves[i])
                 self._layout.addItem(self._plotitems[i], row=i / num_rows, col=i % num_rows)
                 if self.y_range is not None:
@@ -218,21 +235,22 @@ class PGCurveNode(PG2DNode):
                     self._plotitems[i].setXRange(*self.x_range)
         else:
             self._plotitems = self._plotitems[0]
-            for i in xrange(self.input_dim):
+            for i in xrange(n_disp_dims):
                 self._plotitems.addItem(self._curves[i])
                 if self.y_range is None:
                     self._curves[i].setPos(0, (i + 1) * 6)
-                    self._plotitems.setYRange(0, (self.input_dim + 1) * 6)
+                    self._plotitems.setYRange(0, (n_disp_dims + 1) * 6)
                 else:
                     self._curves[i].setPos(0, (i + 1) * (self.y_range[1]-self.y_range[0]))
-                    self._plotitems.setYRange(0, (self.input_dim + 1) * (self.y_range[1]-self.y_range[0]))
+                    self._plotitems.setYRange(0, (n_disp_dims + 1) * (self.y_range[1]-self.y_range[0]))
             if self.x_range is not None:
                 self._plotitems.setXRange(*self.x_range)
 
             self._layout.addItem(self._plotitems)
 
     def _update_plots(self, x):
-        for i in xrange(self.input_dim):
+        x = x[:,self._display_dims]
+        for i in xrange(x.shape[1]):
             self._curves[i].setData(x[:, i])
 
 
@@ -240,13 +258,16 @@ class PGImageNode(PG2DNode):
     """ PGImageNode is a PG2DNode that displays the input data as an Image.
         use_buffer is forcefully unset as it is not required.
     """
-    def __init__(self, img_xy, title=None, plot_size_xy=None, cmap=None, origin='upper', axis_order='row-major', interval=1):
+    def __init__(self, img_shape, title=None, plot_size_xy=None, display_dims=None, cmap=None, origin='upper', axis_order='row-major', interval=1):
         """
-        img_xy: Tuple of x and y dimensions of the image. Used to reshape the 2D data.
+        img_shape: 2D or 3D shape of the image. Used to reshape the 2D data.
         
         title: Window title
 
         plot_size_xy: Plot size (x,y) tuple
+
+        display_dims: Dimensions that are displayed in the plots. By default all dimensions are displayed. Accepted values:
+                      scalar/list/array - displays the provided dimensions
 
         cmap: Color map to use. Supported: Matplotlib color maps - 'jet', 'gray', etc.
 
@@ -259,9 +280,16 @@ class PGImageNode(PG2DNode):
 
          """
         super(PGImageNode, self).__init__(use_buffer=False, x_range=None, y_range=None, interval=interval)
-        self.img_xy = img_xy
-        self.title = title
-        self.plot_size_xy = self.img_xy if plot_size_xy is None else plot_size_xy
+        self.img_shape = img_shape
+        self._title = title
+        self._plot_size_xy= self.img_shape[:2] if plot_size_xy is None else plot_size_xy
+
+        if display_dims is not None:
+            display_dims = mdp.numx.asarray(display_dims)
+            if len(display_dims) != mdp.numx.product(img_shape):
+                raise mdp.NodeException("Length of 'display_dims' (%d) do not match with the 'img_shape' dims (%d)"
+                                        %(len(display_dims),mdp.numx.product(img_shape)))
+        self._display_dims = display_dims
 
         self.cmap = cmap
         if origin not in ['upper', 'lower']:
@@ -292,10 +320,10 @@ class PGImageNode(PG2DNode):
 
     def _setup_plots(self):
         self._win = pg.GraphicsWindow()
-        self._win.resize(*self.plot_size_xy)
+        self._win.resize(*self._plot_size_xy)
         self._win.show()
-        if self.title is not None:
-            self._win.setWindowTitle(self.title)
+        if self._title is not None:
+            self._win.setWindowTitle(self._title)
 
         pg.setConfigOptions(antialias=True)
         pg.setConfigOptions(imageAxisOrder=self.axis_order)
@@ -317,8 +345,9 @@ class PGImageNode(PG2DNode):
         self._plotitem.hideAxis('right')
 
     def _update_plots(self, x):
-        x = x.reshape(self.img_xy[0], self.img_xy[1], x.shape[1]/(self.img_xy[0]*self.img_xy[1]))
-        x = x.squeeze()
+        if self._display_dims is None:
+            self._display_dims = range(0,self.input_dim)
+        x = x[:,self._display_dims].reshape(*self.img_shape)
         if self.origin == "upper":
             if (self.axis_order == 'row-major'):
                 x = x[::-1]
