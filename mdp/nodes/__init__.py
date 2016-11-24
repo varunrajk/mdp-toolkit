@@ -36,6 +36,9 @@ from .pca_nodes_online import CCIPCANode, CCIPCAWhiteningNode
 from .sfa_nodes_online import IncSFANode
 from .stats_nodes_online import MovingAvgNode, MovingTimeDiffNode
 from .hsfa_nodes import HSFANode, HSFAPoolNode
+from .explorer_nodes import (DiscreteExplorerNode, ContinuousExplorerNode, EpsilonGreedyDiscreteExplorerNode,
+                             EpsilonGreedyContinuousExplorerNode, BoltzmannDiscreteExplorerNode, GaussianContinuousExplorereNode,
+                             )
 
 __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
            'CuBICANode', 'TDSEPNode', 'JADENode', 'SFANode', 'SFA2Node',
@@ -53,7 +56,9 @@ __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
            'CutoffNode', 'AdaptiveCutoffNode', 'HistogramNode',
            'IdentityNode', '_OneDimensionalHitParade',
             'MovingAvgNode', 'MovingTimeDiffNode', 'CCIPCANode', 'CCIPCAWhiteningNode', 'MCANode',
-           'IncSFANode', 'HSFANode', 'HSFAPoolNode', 'NumxBufferNode'
+           'IncSFANode', 'HSFANode', 'HSFAPoolNode', 'NumxBufferNode',
+           'DiscreteExplorerNode', 'ContinuousExplorerNode', 'EpsilonGreedyDiscreteExplorerNode',
+           'EpsilonGreedyContinuousExplorerNode', 'BoltzmannDiscreteExplorerNode', 'GaussianContinuousExplorereNode'
            ]
 
 
@@ -118,5 +123,6 @@ utils.fixup_namespace(__name__, __all__ + ['ICANode'],
                        'mca_nodes_online',
                        'sfa_nodes_online',
                        'hsfa_nodes',
-                       'pg_nodes'
+                       'pg_nodes',
+                       'explorer_nodes'
                         ))
