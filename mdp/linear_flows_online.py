@@ -331,7 +331,8 @@ class CircularOnlineFlow(OnlineFlow):
     """A 'CircularOnlineFlow' is a cyclic sequence of online/executable nodes that are trained and executed
     together to form a more complex algorithm.  Input data can be optionally sent to any node
     in the sequence and is successively processed by the subsequent nodes along the loop.
-    In the absence of external Input data, each node receives input from the previous node in the sequence.
+    During training, in the absence of an external input, each node receives input from the previous node in the sequence.
+    See the doc string of the train method. The execute call however, is functionally similar to the OnlineFlow.
 
     Crash recovery is optionally available: in case of failure the current
     state of the flow is saved for later inspection.
@@ -420,16 +421,16 @@ class CircularOnlineFlow(OnlineFlow):
     def train(self, data_iterables=1):
         """Train all trainable-nodes in the flow.
 
-        'data_iterables' is an iterable (including generator-type iterator)
-        that must return data arrays to train nodes (so the data arrays are
-        the 'x' for the nodes).
-        Note that the data arrays are processed by the nodes
-        which are in front of the node that gets trained,
-        so the data dimension must match the input dimension of the first node.
+        'data_iterables' is either an iterable (including generator-type iterator),
+        a 2D or a 3D numpy array or a scalar. If an iterable is passed, then it must
+        return data arrays to train nodes (so the data arrays are the 'x' for the nodes).
+        If a 2D array is passed that it trains all the nodes incrementally, while if
+        a 3D array is passed, it performs online training in batches (=shape[1]).
+        This is functionally similar to the OnlineFlow.
 
-        data_iterables can also be a 2D or a 3D numpy array. A 2D array trains
-        all the nodes incrementally, while a 3D array supports online training
-        in batches (=shape[1]).
+        However, if a scalar (say i) is passed, the flow uses the '_stored_input' to
+        train the nodes in a circular manner for i iterations. At the end of
+        each iteration the '_stored_input' is updated and used for the next iteration.
 
         Circular flow does not support passing training arguments.
 
@@ -448,6 +449,7 @@ class CircularOnlineFlow(OnlineFlow):
 
     def execute(self, iterable, nodenr=None):
         """Process the data through all nodes between input and the output node.
+        This is functionally similar to the execute method of an OnlineFlow.
 
         'iterable' is an iterable or iterator (note that a list is also an
         iterable), which returns data arrays that are used as input to the flow.
