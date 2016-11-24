@@ -178,7 +178,8 @@ class PGCurveNode(PG2DNode):
     """ PGCurveNode is a PG2DNode that displays the input data as multiple curves.
         Use_buffer needs to be set if the data arrives sample by sample.
     """
-    def __init__(self, title=None, plot_size_xy=(640,480), split_figs=False, display_dims=None, use_buffer=False, x_range=None, y_range=None, interval=1):
+    def __init__(self, title=None, plot_size_xy=(640,480), split_figs=False, display_dims=None, use_buffer=False, x_range=None, y_range=None, interval=1,
+                 input_dim=None, output_dim=None, dtype=None):
         """
         title: Window title
 
@@ -191,7 +192,8 @@ class PGCurveNode(PG2DNode):
                       scalar/list/array - displays the provided dimensions
 
          """
-        super(PGCurveNode, self).__init__(use_buffer, x_range, y_range, interval)
+        super(PGCurveNode, self).__init__(use_buffer=use_buffer, x_range=x_range, y_range=y_range, interval=interval,
+                                          input_dim=input_dim, output_dim=output_dim, dtype=dtype)
         self._title = title
         self._plot_size_xy= plot_size_xy
         self._split_figs = split_figs
@@ -258,7 +260,8 @@ class PGImageNode(PG2DNode):
     """ PGImageNode is a PG2DNode that displays the input data as an Image.
         use_buffer is forcefully unset as it is not required.
     """
-    def __init__(self, img_shape, title=None, plot_size_xy=None, display_dims=None, cmap=None, origin='upper', axis_order='row-major', interval=1):
+    def __init__(self, img_shape, title=None, plot_size_xy=None, display_dims=None, cmap=None, origin='upper', axis_order='row-major', interval=1,
+                 input_dim=None, output_dim=None, dtype=None):
         """
         img_shape: 2D or 3D shape of the image. Used to reshape the 2D data.
         
@@ -279,7 +282,8 @@ class PGImageNode(PG2DNode):
                     in the standard (row, col) order. For 'col-major', image data is expected in reversed (col, row) order.
 
          """
-        super(PGImageNode, self).__init__(use_buffer=False, x_range=None, y_range=None, interval=interval)
+        super(PGImageNode, self).__init__(use_buffer=False, x_range=None, y_range=None, interval=interval,
+                                          input_dim=input_dim, output_dim=output_dim, dtype=dtype)
         self.img_shape = img_shape
         self._title = title
         self._plot_size_xy= self.img_shape[:2] if plot_size_xy is None else plot_size_xy
@@ -289,6 +293,9 @@ class PGImageNode(PG2DNode):
             if len(display_dims) != mdp.numx.product(img_shape):
                 raise mdp.NodeException("Length of 'display_dims' (%d) do not match with the 'img_shape' dims (%d)"
                                         %(len(display_dims),mdp.numx.product(img_shape)))
+        else:
+            display_dims = mdp.numx.product(img_shape)
+
         self._display_dims = display_dims
 
         self.cmap = cmap
@@ -345,8 +352,6 @@ class PGImageNode(PG2DNode):
         self._plotitem.hideAxis('right')
 
     def _update_plots(self, x):
-        if self._display_dims is None:
-            self._display_dims = range(0,self.input_dim)
         x = x[:,self._display_dims].reshape(*self.img_shape)
         if self.origin == "upper":
             if (self.axis_order == 'row-major'):
