@@ -170,7 +170,7 @@ class EpsilonGreedyDiscreteExplorerNode(DiscreteExplorerNode):
 
 
     def _train(self, x):
-        self.epsilon*=self.decay
+        self.epsilon*=self.decay**x.shape[0]
 
     def _execute(self, x, prob_vec=None):
         f = (self.numx_rng.rand(x.shape[0],1) < self.epsilon)
@@ -208,7 +208,7 @@ class EpsilonGreedyContinuousExplorerNode(ContinuousExplorerNode):
 
 
     def _train(self, x):
-        self.epsilon*=self.decay
+        self.epsilon*=self.decay**x.shape[0]
 
     def _execute(self, x):
         f = (self.numx_rng.rand(x.shape[0],1) < self.epsilon)
@@ -248,7 +248,7 @@ class BoltzmannDiscreteExplorerNode(DiscreteExplorerNode):
         self._output_dim = 1
 
     def _train(self, x):
-        self.temperature*=self.decay
+        self.temperature*=self.decay**x.shape[0]
 
     def _execute(self, x, prob_vec=None):
         e = mdp.numx.e
@@ -293,7 +293,7 @@ class GaussianContinuousExplorereNode(ContinuousExplorerNode):
         self._output_dim = len(action_lims)
 
     def _train(self, x):
-        self.sigma*=self.decay
+        self.sigma*=self.decay**x.shape[0]
 
     def _execute(self, x):
         return x + self.numx_rng.multivariate_normal(mdp.numx.zeros(self.input_dim), mdp.numx.diag(self.sigma), x.shape[0])
