@@ -337,3 +337,38 @@ def test_clone_online_layer():
     assert_array_equal(out[:,:2], nodes(inp[:,:2]))
     assert_array_equal(out[:,2:4], nodes(inp[:,:2]))
 
+
+def test_online_flow_node():
+    flow = OnlineFlow([BogusOnlineNode(input_dim=2, output_dim=2),
+                        BogusOnlineDiffDimNode(input_dim=2, output_dim=4),
+                        BogusNode(input_dim=4, output_dim=4)])
+
+    node = mdp.hinet.OnlineFlowNode(flow, numx_rng=mdp.numx_rand.RandomState(seed=1))
+
+    inp = numx.ones((1,2))
+    node.train(inp)
+    out = node(inp)
+    assert_array_equal(out, numx.ones((1,4))*8)
+    assert_array_equal(node._flow[0].sum, inp[:,:2])
+    assert_array_equal(node._flow[1].sum, inp[:,:2]*2)
+    assert(node.numx_rng == node._flow[0].numx_rng)
+    assert(node.numx_rng == node._flow[1].numx_rng)
+
+    flow = CircularOnlineFlow([BogusOnlineNode(input_dim=2, output_dim=2),
+                        BogusOnlineDiffDimNode(input_dim=2, output_dim=4),
+                        BogusNode(input_dim=4, output_dim=4),
+                        BogusOnlineDiffDimNode(input_dim=4, output_dim=2)])
+
+    node = mdp.hinet.OnlineFlowNode(flow, numx_rng=mdp.numx_rand.RandomState(seed=1))
+
+    inp = numx.ones((1,2))
+    node.train(inp)
+    out = node(inp)
+    assert_array_equal(out, numx.ones((1,2))*32)
+    assert_array_equal(node._flow[0].sum, inp[:,:2])
+    assert_array_equal(node._flow[1].sum, inp[:,:2]*2)
+    assert(node.numx_rng == node._flow[0].numx_rng)
+    assert(node.numx_rng == node._flow[1].numx_rng)
+    assert(node.numx_rng == node._flow[3].numx_rng)
+
+

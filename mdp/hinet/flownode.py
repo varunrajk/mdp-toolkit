@@ -227,8 +227,8 @@ class OnlineFlowNode(FlowNode, mdp.OnlineNode):
     This is handy if you want to use a OnlineFlow where a OnlineNode is required.
     Additional args and kwargs for train and execute are supported.
 
-    Unlike an OnlineFlow, OnlineFlowNode only supports either a
-    terminal OnlineNode, trained or non-trainable Node.
+    Unlike an OnlineFlow, OnlineFlowNode requires all the nodes to be either
+     an OnlineNode, trained or non-trainable Node.
 
     All the read-only container slots are supported and are forwarded to the
     internal flow.
@@ -239,8 +239,7 @@ class OnlineFlowNode(FlowNode, mdp.OnlineNode):
         self._cache = flow.cache
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
-        self._numx_rng = None
-        self.set_numx_rng(numx_rng)
+        self.numx_rng = numx_rng
         # set training type
         self._set_training_type_from_flow(flow)
 
@@ -256,7 +255,6 @@ class OnlineFlowNode(FlowNode, mdp.OnlineNode):
             if flow[-1].is_training():
                 raise TypeError("OnlineFlowNode supports either only a terminal OnlineNode, a trained or a non-trainable Node.")
 
-
     def _set_training_type_from_flow(self, flow):
         for node in flow:
             if hasattr(node, 'training_type') and (node.training_type == 'incremental'):
@@ -269,14 +267,10 @@ class OnlineFlowNode(FlowNode, mdp.OnlineNode):
             raise mdp.NodeException("Cannot change the training type to %s. It is inferred from "
                                     "the flow and is set to '%s'. "%(training_type, self.training_type))
 
-    def set_cache(self, c):
-        raise mdp.NodeException("Cannot set the read only cache attribute. ")
-
-    def set_numx_rng(self, rng):
-        super(OnlineFlowNode, self).set_numx_rng(rng)
+    def _set_numx_rng(self, rng):
         # set the numx_rng for all the nodes to be the same.
         for node in self._flow:
             if hasattr(node, 'set_numx_rng'):
-                node.set_numx_rng(rng)
-
+                node.numx_rng = rng
+        self._numx_rng = rng
 
