@@ -450,3 +450,18 @@ def set_configuration():
                                      'version %s is too old' % version)
         else:
             config.ExternalDepFound('pyqtgraph', version)
+
+    # OpenAI's Gym
+    try:
+        import gym
+    except ImportError as exc:
+        config.ExternalDepFailed('gym', exc)
+    else:
+        version = gym.version.VERSION
+        if os.getenv('MDP_DISABLE_GYM'):
+            config.ExternalDepFailed('gym', 'disabled')
+        elif _version_too_old(version, (0, 5, 4)):
+            config.ExternalDepFailed('gym',
+                                     'version %s is too old' % version)
+        else:
+            config.ExternalDepFound('gym', version)

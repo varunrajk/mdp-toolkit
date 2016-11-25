@@ -89,6 +89,9 @@ if config.has_pyqtgraph:
     from .pg_nodes import PG2DNode, PGCurveNode, PGImageNode
     __all__+= ['PG2DNode', 'PGCurveNode', 'PGImageNode']
 
+if config.has_gym:
+    from .openai_gym_nodes import GymNode
+    __all__+=['GymNode']
 
 from mdp import utils
 utils.fixup_namespace(__name__, __all__ + ['ICANode'],
@@ -124,5 +127,6 @@ utils.fixup_namespace(__name__, __all__ + ['ICANode'],
                        'sfa_nodes_online',
                        'hsfa_nodes',
                        'pg_nodes',
-                       'explorer_nodes'
+                       'explorer_nodes',
+                       'openai_gym_nodes'
                         ))
