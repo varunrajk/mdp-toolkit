@@ -69,6 +69,11 @@ class OnlineLayer(Layer, mdp.OnlineNode):
                 return
         self._training_type = 'batch'
 
+    def set_training_type(self, training_type):
+        if self.training_type != training_type:
+            raise mdp.NodeException("Cannot change the training type to %s. It is inferred from "
+                                    "the nodes and is set to '%s'. "%(training_type, self.training_type))
+
     def _set_numx_rng(self, rng):
         # set the numx_rng for all the nodes to be the same.
         for node in self.nodes:
