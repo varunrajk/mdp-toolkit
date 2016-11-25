@@ -19,8 +19,8 @@ class OnlineFlow(mdp.Flow):
     OnlineFlow sequence can contain trained or non-trainable Nodes and optionally
     a terminal trainable Node.
 
-    Differences between Flow and an OnlineFlow:
-    a) In Flow, data is processed sequentially training one node at a time. Whereas, in an
+    Differences between a Flow and an OnlineFlow:
+    a) In Flow, data is processed sequentially, training one node at a time. Whereas, in an
        OnlineFlow data is processed simultaneously training all the nodes at the same time.
 
     b) Flow requires a list of dataiterables with a length equal to the
@@ -42,8 +42,6 @@ class OnlineFlow(mdp.Flow):
     methods are available. An 'OnlineFlow' can be saved or copied using the
     corresponding 'save' and 'copy' methods.
 
-    OnlineFlow like an OnlineNode has 'cache' that is a dict of stored cache variables
-    from individual nodes.
     """
 
     def __init__(self, flow, crash_recovery=False, verbose=False):
@@ -163,18 +161,18 @@ class OnlineFlow(mdp.Flow):
     def train(self, data_iterables):
         """Train all trainable nodes in the flow.
 
-        'data_iterables' is an iterable (including generator-type  iterators if
+        'data_iterables' is a single iterable (including generator-type iterators if
         the last node has no multiple training phases) that must return data
         arrays to train nodes (so the data arrays are the 'x' for the nodes).
         Note that the data arrays are processed by the nodes
         which are in front of the node that gets trained,
         so the data dimension must match the input dimension of the first node.
 
-        data_iterables can also be a 2D or a 3D numpy array. A 2D array trains
+        'data_iterables' can also be a 2D or a 3D numpy array. A 2D array trains
         all the nodes incrementally, while a 3D array supports online training
         in batches (=shape[1]).
 
-        data_iterables can also return a list or a tuple, where the first entry is
+        'data_iterables' can also return a list or a tuple, where the first entry is
         'x' and the following are the required args for training all the nodes in
         the flow (e.g. for supervised training).
 
@@ -183,7 +181,7 @@ class OnlineFlow(mdp.Flow):
         if say node-i does not require any args, the provided (node-i args) are ignored.
         So, one can simply use None for the nodes that do not require args.
 
-        (x, (node-0 args), ..., None, ..., (node-n args)) - None args for the ith node.
+        (x, (node-0 args), ..., None, ..., (node-n args)) - No args for the ith node.
 
         """
 
@@ -329,10 +327,15 @@ class OnlineFlow(mdp.Flow):
 
 class CircularOnlineFlow(OnlineFlow):
     """A 'CircularOnlineFlow' is a cyclic sequence of online/executable nodes that are trained and executed
-    together to form a more complex algorithm.  Input data can be optionally sent to any node
-    in the sequence and is successively processed by the subsequent nodes along the loop.
-    During training, in the absence of an external input, each node receives input from the previous node in the sequence.
-    See the doc string of the train method. The execute call however, is functionally similar to the OnlineFlow.
+    together to form a more complex algorithm.  The input and output nodes of the flow can be changed
+    at any time using the functions "set_input_node" and "set_output_node".
+
+    CircularOnlineFlow also supports training without external input data. In this case, the flow iterates
+    using the previously stored output as an input. However, when some external data is provided, the previously
+    stored outputs are ignored and the nodes are trained in a manner similar to that of an OnlineFlow. The
+    output is stored at the end to enable further iterations. See the doc string of the train method.
+
+    The execute call is functionally similar to the OnlineFlow.
 
     Crash recovery is optionally available: in case of failure the current
     state of the flow is saved for later inspection.
@@ -340,11 +343,6 @@ class CircularOnlineFlow(OnlineFlow):
     CircularOnlineFlow objects are Python containers. Most of the builtin 'list'
     methods are available. CircularOnlineFlow can be saved or copied using the
     corresponding 'save' and 'copy' methods.
-
-    This input and output nodes of the flow can be changed at any time using the functions
-    "set_input_node" and "set_output_node". Circular flow also supports data processing
-    without providing it with any external input. In this case, the flow iterates using
-    the previously stored output as an input.
 
     CircularOnlineFlow like an OnlineNode has 'cache' that is a dict of stored cache variables
     from individual nodes.
@@ -395,6 +393,8 @@ class CircularOnlineFlow(OnlineFlow):
         Note that this method does not distinguish between iterables and
         iterators, so this must be taken care of later.
         """
+        # if a scalar is given, training is carried out using the stored inputs.
+        # The scalar denotes the number train iterations.
         if mdp.numx.isscalar(data_iterables):
             cnt = data_iterables
             def iterfn():
