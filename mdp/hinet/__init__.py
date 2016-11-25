@@ -27,7 +27,7 @@ It maps the data according to rectangular overlapping 2d input areas. One can
 then feed the output into a Layer and each Node will get the correct input.
 """
 
-from .flownode import (FlowNode, OnlineFlowNode, ExecutableFlowNode)
+from .flownode import (FlowNode, OnlineFlowNode)
 from .layer import Layer, SameInputLayer, CloneLayer
 from .layer_online import OnlineLayer, SameInputOnlineLayer, CloneOnlineLayer
 from .switchboard import (
@@ -47,7 +47,7 @@ from .switchboard_factory import (
     FactoryDoubleRhomb2dSwitchboard
 )
 
-__all__ = ['FlowNode', 'OnlineFlowNode', 'ExecutableFlowNode', 'Layer', 'SameInputLayer', 'CloneLayer',
+__all__ = ['FlowNode', 'OnlineFlowNode', 'Layer', 'SameInputLayer', 'CloneLayer',
            'OnlineLayer', 'SameInputOnlineLayer', 'CloneOnlineLayer',
            'Switchboard', 'SwitchboardException', 'ChannelSwitchboard',
            'Rectangular2dSwitchboard', 'Rectangular2dSwitchboardException',

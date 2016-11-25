@@ -306,20 +306,6 @@ def test_circular_flow():
     assert_array_equal(out, inp*140)
 
 
-def test_executable_flow_node():
-    node = mdp.nodes.SFANode()
-    x = numx.random.randn(100,3)
-    exenode = mdp.hinet.ExecutableFlowNode(node)
-    exenode.train(x)
-    interim_out = exenode.execute(x)
-    assert(numx.isnan(interim_out).any())
-    exenode.train(x)
-    exenode.stop_training()
-    out = exenode.execute(x)
-    assert(not numx.isnan(out).all())
-    assert_array_equal(out, node(x))
-
-
 def test_online_layer():
     nodes = [BogusOnlineNode(input_dim=2, output_dim=2), BogusOnlineDiffDimNode(input_dim=4, output_dim=8), BogusNode(input_dim=3, output_dim=3)]
     layer = mdp.hinet.OnlineLayer(nodes, numx_rng=mdp.numx_rand.RandomState(seed=2))

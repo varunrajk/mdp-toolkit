@@ -198,10 +198,10 @@ class OnlineFlow(mdp.Flow):
     ###### private container methods
 
     def _check_value_type_is_compatible(self, value):
-        # onlinenodes, (special case) Executable FlowNode, trained and non-trainable nodes are compatible
+        # onlinenodes, trained and non-trainable nodes are compatible
         if not isinstance(value, mdp.Node):
             raise TypeError("flow item must be a Node instance and not %s"%(type(value)))
-        elif isinstance(value, mdp.hinet.ExecutableFlowNode) or isinstance(value, mdp.OnlineNode):
+        elif isinstance(value, mdp.OnlineNode):
             pass
         else:
             # classic mdp Node
