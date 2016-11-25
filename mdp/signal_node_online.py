@@ -10,31 +10,37 @@ class OnlineNode(Node):
     """An online Node (OnlineNode) is the basic building block of
         an online MDP application.
 
-        It represents a data processing element, like for example a learning
+        It represents a data processing element, for example a learning
         algorithm, a data filter, or a visualization step.
-        Each node has a continuous training phase, during which the
-        internal structures are learned from training data (e.g. the weights
-        of a neural network are adapted) and an execution phase, where new
-        data can be processed forwards (by processing the data through the node)
-        or backwards (by applying the inverse of the transformation computed by
-        the node if defined).
+        Each node has a training phase (optional), during which the
+        internal structures are updated incrementally (or in batches)
+        from training data (e.g. the weights of a neural network are adapted).
 
-        OnlineNodes have been designed to be updated incrementally or block-incrementally
-        on a continuous stream of input data. It is thus possible to perform
-        computations on amounts of data that would not fit into memory or
-        to generate data on-the-fly.
+        Each node can also be executed at any point in time, where new
+        data can be processed forwards (or backwards by applying the inverse
+        of the transformation computed by the node if defined).
 
-        An `OnlineNode` also defines some utility methods, like for example
-        `copy` and `save`, that return an exact copy of a node and save it
+        Unlike a Node, OnlineNode's execute (or inverse) call __does not__ end the
+        training phase of the node. The training phase can only be stopped through
+        an explicit 'stop_training' call. Once stopped, an OnlineNode becomes
+        functionally equivalent to a trained Node.
+
+        The training type of an OnlineNode can be set either to 'incremental'
+        or 'batch'. When set to 'incremental', the input data array is passed for
+        training sample by sample, while for 'batch' the entire data array is passed.
+
+        An `OnlineNode` inherits all the Node's utility methods, for example
+        `copy` and `save`, that returns an exact copy of a node and saves it
         in a file, respectively. Additional methods may be present, depending
         on the algorithm.
 
-        OnlineNodes also supports using a pre-seeded random number generator (through
-        'numx_rng' parameter. This can be used to replicate results.
+        OnlineNodes also support using a pre-seeded random number generator
+        through a 'numx_rng' argument. This can be useful to replicate
+        results.
 
         `OnlineNode` subclasses should take care of overwriting (if necessary)
         the functions `_train`, `_stop_training`, `_execute`, 'is_trainable',
-        `is_invertible`, `_inverse`, 'set_training_type', and `_get_supported_dtypes`.
+        `is_invertible`, `_inverse`, and `_get_supported_dtypes`.
         If you need to overwrite the getters and setters of the
         node's properties refer to the docstring of `get_input_dim`/`set_input_dim`,
         `get_output_dim`/`set_output_dim`, `get_dtype`/`set_dtype`, 'get_numx_rng'/'set_numx_rng'.
@@ -46,12 +52,11 @@ class OnlineNode(Node):
         method is called for the first time.
         If dtype is unspecified, it will be inherited from the data
         it receives at the first call of `train` or `execute`.
-        If numx_rng is unspecified, it will be set a random number generator
-        with a random seed.
-
         Every subclass must take care of up- or down-casting the internal
         structures to match this argument (use `_refcast` private
         method when possible).
+        If numx_rng is unspecified, it will be set to a random number generator
+        with a random seed.
         """
         super(OnlineNode, self).__init__(input_dim,output_dim,dtype)
         # this var stores the index of the current training iteration
@@ -77,7 +82,7 @@ class OnlineNode(Node):
 
     def set_numx_rng(self, rng):
         """Set numx random number generator.
-            Perform type checks
+        Note that subclasses should overwrite `self._set_numx_rng` when needed.
         """
         if rng is None:
             pass
@@ -106,7 +111,6 @@ class OnlineNode(Node):
 
     def set_training_type(self, training_type):
         """Sets the training type ('incremental' or 'batch')
-            Overwrite this in the subclass to fix the training_type.
         """
 
         if (training_type == 'incremental') or (training_type == 'batch'):
@@ -169,6 +173,7 @@ class OnlineNode(Node):
     # they receive the data already casted to the correct type
 
     def _check_params(self, x):
+        # overwrite to check if the parameters are properly defined.
         pass
 
     ### User interface to the overwritten methods
@@ -240,7 +245,7 @@ class OnlineNode(Node):
 
     def __add__(self, other):
         # check other is a node
-        if isinstance(other, OnlineNode):
+        if isinstance(other, Node):
             return mdp.Flow([self, other])
         elif isinstance(other, mdp.Flow):
             flow_copy = other.copy()
