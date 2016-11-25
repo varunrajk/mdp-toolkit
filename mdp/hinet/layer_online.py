@@ -35,8 +35,7 @@ class OnlineLayer(Layer, mdp.OnlineNode):
         self._cache = self._get_cache_from_nodes(nodes)
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
-        self._numx_rng = None
-        self.set_numx_rng(numx_rng)
+        self.numx_rng = numx_rng
         # set training type
         self._set_training_type_from_nodes(nodes)
 
@@ -47,15 +46,12 @@ class OnlineLayer(Layer, mdp.OnlineNode):
         # onlinenodes, trained and non-trainable nodes are compatible
         if not isinstance(value, mdp.Node):
             raise TypeError("'nodes' item must be a Node instance and not %s"%(type(value)))
-        elif isinstance(value, mdp.hinet.ExecutableFlowNode) or isinstance(value, mdp.OnlineNode):
+        elif isinstance(value, mdp.OnlineNode):
             pass
         else:
             # classic mdp Node
             if value.is_training():
                 raise TypeError("'nodes' item must either be an OnlineNode, a trained or a non-trainable Node.")
-
-    def set_cache(self, c):
-        raise mdp.NodeException("Can't set the read only cache attribute. ")
 
     def _get_cache_from_nodes(self, nodes):
         _cache = {}
@@ -73,15 +69,12 @@ class OnlineLayer(Layer, mdp.OnlineNode):
                 return
         self._training_type = 'batch'
 
-    def set_numx_rng(self, rng):
-        super(OnlineLayer, self).set_numx_rng(rng)
+    def _set_numx_rng(self, rng):
         # set the numx_rng for all the nodes to be the same.
         for node in self.nodes:
             if hasattr(node, 'set_numx_rng'):
-                node.set_numx_rng(rng)
-
-    def train(self, x, *args, **kwargs):
-        super(OnlineLayer, self).train(x, *args, **kwargs)
+                node.numx_rng = rng
+        self._numx_rng = rng
 
     def _get_train_seq(self):
         """Return the train sequence.
@@ -116,8 +109,7 @@ class CloneOnlineLayer(CloneLayer, OnlineLayer):
         self._cache = node.cache
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
-        self._numx_rng = None
-        self.set_numx_rng(numx_rng)
+        self.numx_rng = numx_rng
         # set training type
         self._set_training_type_from_nodes([node])
 
@@ -143,8 +135,7 @@ class SameInputOnlineLayer(SameInputLayer, OnlineLayer):
         self._cache = self._get_cache_from_nodes(nodes)
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
-        self._numx_rng = None
-        self.set_numx_rng(numx_rng)
+        self.numx_rng = numx_rng
         # set training type
         self._set_training_type_from_nodes(nodes)
 
