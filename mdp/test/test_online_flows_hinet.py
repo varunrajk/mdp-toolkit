@@ -319,3 +319,35 @@ def test_executable_flow_node():
     assert(not numx.isnan(out).all())
     assert_array_equal(out, node(x))
 
+
+def test_online_layer():
+    nodes = [BogusOnlineNode(input_dim=2, output_dim=2), BogusOnlineDiffDimNode(input_dim=4, output_dim=8), BogusNode(input_dim=3, output_dim=3)]
+    layer = mdp.hinet.OnlineLayer(nodes, numx_rng=mdp.numx_rand.RandomState(seed=2))
+    assert(layer.input_dim == 9)
+    assert(layer.output_dim == 13)
+    assert(layer.numx_rng == nodes[0].numx_rng)
+    assert(layer.numx_rng == nodes[1].numx_rng)
+
+    inp = numx.ones((1,9))
+    layer.train(inp)
+    out = layer(inp)
+    assert_array_equal(nodes[0].sum, inp[:,:2])
+    assert_array_equal(nodes[1].sum, inp[:,:4])
+    assert_array_equal(out[:,:2], nodes[0](inp[:,:2]))
+    assert_array_equal(out[:,2:-3], nodes[1](inp[:,:4]))
+    assert_array_equal(out[:,-3:], nodes[2](inp[:,:3]))
+
+def test_clone_online_layer():
+    nodes = BogusOnlineNode(input_dim=2, output_dim=2)
+    layer = mdp.hinet.CloneOnlineLayer(nodes, n_nodes=2, numx_rng=mdp.numx_rand.RandomState(seed=1))
+    assert(layer.input_dim == 4)
+    assert(layer.output_dim == 4)
+    assert(layer.numx_rng == nodes.numx_rng)
+
+    inp = numx.ones((1,4))
+    layer.train(inp)
+    out = layer(inp)
+    assert_array_equal(nodes.sum, inp[:,:2]+inp[:,:2])
+    assert_array_equal(out[:,:2], nodes(inp[:,:2]))
+    assert_array_equal(out[:,2:4], nodes(inp[:,:2]))
+
