@@ -294,7 +294,7 @@ class PGImageNode(PG2DNode):
                 raise mdp.NodeException("Length of 'display_dims' (%d) do not match with the 'img_shape' dims (%d)"
                                         %(len(display_dims),mdp.numx.product(img_shape)))
         else:
-            display_dims = mdp.numx.product(img_shape)
+            display_dims = range(0,mdp.numx.product(img_shape))
 
         self._display_dims = display_dims
 
