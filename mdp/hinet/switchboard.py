@@ -778,9 +778,34 @@ class RandomChannelSwitchboard(ChannelSwitchboard):
         return x[:, self.connections]
 
 
+class Pool2DException(mdp.NodeException):
+    """Exception for routing problems in the Switchboard class."""
+    pass
 
 class Pool2D(Rectangular2dSwitchboard):
+    """
+    Pool2D is a (rectangular switchboard) node that down-samples a 2D input (like an image, 2D filter response maps, etc.) by applying a
+    pooling function over sub-regions spanned by rectangular receptive fields.
+
+    The node provides a default set of pooling modes = 'max', 'mean', 'sum'. These can be selected by passing
+    the string to the mode argument.
+
+    Custom pooling function (mode = "new") can be added by inheriting this as a metaclass and adding a method
+
+    def _new_fn(self, x):
+        y = ...processing...
+        return y
+
+    Care must be taken while designing with the custom pool_fn:
+    a) The input 'x' to the function is 4D data (samples nrs, receptive field blocks, pooling dims, in_channel_dims)
+    b) The output 'y' of the function is 3D data (sample nrs, receptive field blocks, in_channel_dims)
+
+    """
     def __init__(self, in_channels_xy, field_channels_xy, field_spacing_xy=None, in_channel_dim=1, ignore_cover=True, mode='max'):
+        """
+        Arguments similar to a Rectangular2DSwitchboard.
+        mode - pooling mode. Accepted values - 'max', 'mean', 'sum'.
+        """
         if field_spacing_xy is None:
             field_spacing_xy = field_channels_xy
         elif (field_spacing_xy[0] is None) or (field_spacing_xy[1] is None):
@@ -788,20 +813,23 @@ class Pool2D(Rectangular2dSwitchboard):
                                 field_channels_xy[1] if field_spacing_xy[1] is None else field_spacing_xy[1])
 
         super(Pool2D, self).__init__(in_channels_xy, field_channels_xy, field_spacing_xy, in_channel_dim, ignore_cover)
+        if not hasattr(self, "_%s_fn"%(mode)):
+            raise Pool2DException("Unrecognized pooling mode. Supported: 'max', 'mean', 'sum', given %s"%(mode))
         self.mode = mode
         self._set_output_dim(mdp.numx.prod(self.out_channels_xy)*self.in_channel_dim)
-        if mode == 'max':
-            self._fn = _numx.max
-        elif mode == 'mean':
-            self._fn = _numx.mean
-        elif mode == 'sum':
-            self._fn = _numx.sum
-        else:
-            raise mdp.NodeException('Unknown mode for pooling.')
+
+    def _max_fn(self, x):
+        return _numx.max(x, axis=2)
+
+    def _mean_fn(self, x):
+        return _numx.mean(x, axis=2)
+
+    def _sum_fn(self, x):
+        return _numx.sum(x, axis=2)
 
     def _execute(self, x):
         x = super(Pool2D, self)._execute(x)
         dim = int(x.shape[1]/self.output_dim)
-        xout = self._fn(x.reshape(x.shape[0],mdp.numx.prod(self.out_channels_xy),dim,self.in_channel_dim), axis=2)
+        xout = getattr(self, "_%s_fn"%(self.mode))(x.reshape(x.shape[0],mdp.numx.prod(self.out_channels_xy),dim,self.in_channel_dim))
         return xout.reshape(x.shape[0], self.output_dim)
 

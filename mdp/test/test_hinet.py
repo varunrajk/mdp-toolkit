@@ -511,3 +511,29 @@ def testHiNetXHTML():
     hinet_html = mdp.hinet.HiNetXHTMLVisitor(html_file)
     hinet_html.convert_flow(flow)
     html_file.close()
+
+
+def test_pool2d():
+    pool2d = mh.Pool2D(in_channels_xy=(10,10), field_channels_xy=(2,2), in_channel_dim=3, mode='max')
+    sb = mh.Rectangular2dSwitchboard(in_channels_xy=pool2d.in_channels_xy, field_channels_xy=pool2d.field_channels_xy,
+                                     field_spacing_xy=pool2d.field_spacing_xy, in_channel_dim=pool2d.in_channel_dim)
+    data = mdp.numx_rand.randn(1,300)
+    out = pool2d(data)
+    exp_out = sb(data).reshape(1,25,4,3).max(axis=2).reshape(1, 75)
+    assert_array_equal(out, exp_out)
+
+    class NewPool2D(mh.Pool2D):
+        def _min_fn(self, x):
+            return x.min(axis=2)
+
+    pool2d = NewPool2D(in_channels_xy=(10,10), field_channels_xy=(2,2), in_channel_dim=3, mode='min')
+    sb = mh.Rectangular2dSwitchboard(in_channels_xy=pool2d.in_channels_xy, field_channels_xy=pool2d.field_channels_xy,
+                                     field_spacing_xy=pool2d.field_spacing_xy, in_channel_dim=pool2d.in_channel_dim)
+    data = mdp.numx_rand.randn(1,300)
+    out = pool2d(data)
+    exp_out = sb(data).reshape(1,25,4,3).min(axis=2).reshape(1, 75)
+    assert_array_equal(out, exp_out)
+
+
+
+
