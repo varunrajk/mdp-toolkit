@@ -214,7 +214,7 @@ class HSFANode(mdp.Node):
             def _train(x, *args, **kwargs):
                 if _i_node > 0:
                     x = self._execution_flow.execute(x, nodenr=_i_node - 1)
-                _node.train(x + 0.0001 * mdp.numx.randn(*x.shape), *args, **kwargs)
+                _node.train(x + 0.0001 * mdp.numx_rand.randn(*x.shape), *args, **kwargs)
             return _train
 
         train_seq = []
