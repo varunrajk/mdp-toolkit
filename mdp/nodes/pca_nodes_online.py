@@ -74,7 +74,10 @@ class CCIPCANode(mdp.OnlineNode):
 
     def _check_params(self, *args):
         if self._init_v is None:
-            self.init_eigen_vectors = 0.1 * self.numx_rng.randn(self.input_dim, self.output_dim)
+            if self.output_dim is not None:
+                self.init_eigen_vectors = 0.1 * self.numx_rng.randn(self.input_dim, self.output_dim)
+            else:
+                self.init_eigen_vectors = 0.1 * self.numx_rng.randn(self.input_dim, self.input_dim)
 
     def _amnesic(self, n):
         _i = float(n + 1)
