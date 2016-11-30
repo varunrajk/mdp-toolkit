@@ -159,10 +159,6 @@ class OnlineNode(Node):
     def _check_input(self, x):
         super(OnlineNode, self)._check_input(x)
 
-        # set the output dimension if necessary
-        if self.output_dim is None:
-            self.output_dim = self.input_dim
-
         # set numx_rng if necessary
         if self.numx_rng is None:
             self.numx_rng = mdp.numx_rand.RandomState()
