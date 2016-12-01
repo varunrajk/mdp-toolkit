@@ -20,10 +20,14 @@ class OnlineNode(Node):
         data can be processed forwards (or backwards by applying the inverse
         of the transformation computed by the node if defined).
 
-        Unlike a Node, OnlineNode's execute (or inverse) call __does not__ end the
+        Unlike a Node, an OnlineNode's execute (or inverse) call __does not__ end the
         training phase of the node. The training phase can only be stopped through
         an explicit 'stop_training' call. Once stopped, an OnlineNode becomes
         functionally equivalent to a trained Node.
+
+        OnlineNode also supports multiple training phases. However, all
+        the training_phases are active for each data point. See _train_seq
+        documentation for more information.
 
         The training type of an OnlineNode can be set either to 'incremental'
         or 'batch'. When set to 'incremental', the input data array is passed for
@@ -118,6 +122,46 @@ class OnlineNode(Node):
         else:
             raise NodeException("Unknown training type specified %s. Supported types ['incremental', 'batch']"%(training_type))
 
+
+    # Each element in the _train_seq contains three sub elements
+    # (training-phase, stop-training-phase, execution-phase)
+    # as opposed to the two elements for the Node (training-phase, stop-training-phase).
+    # Execution-phases come in handy for online training to transfer
+    # data between the active training phases.
+    # For eg. in a flow of OnlineNodes = [node1, node2, node3],
+    # where each phase is assigned to each node.
+    # The execution phases enable the output of node1 to
+    # be fed to node2 and the output of node2 to node3. Therefore,
+    # requiring only two execute calls for the given input x.
+    # node1 -> execute -> node2 -> execute -> node3.
+    # Whereas, using the original _train_seq, we have
+    # node1 -> execute -> node2
+    # node1 -> execute -> node2 -> execute -> node3,
+    # requiring three execute calls. This difference increases
+    # with more number of nodes and is not efficient if the execute calls of the nodes
+    # are computationally expensive.
+    # Having said that, the modified _train_seq only makes sense for online training
+    # and not when the nodes are trained sequentially (with only one active training phase)
+    # in an offline sense.
+    # The default behavior is kept functionally identical to the
+    # original _train_seq. Check OnlineFlowNodes where the execution phases are used.
+
+    _train_seq = property(lambda self: self._get_train_seq(),
+                          doc="""\
+        List of tuples::
+
+          [(training-phase1, stop-training-phase1, execution-phase1),
+           (training-phase2, stop_training-phase2, execution-phase2),
+           ...]
+
+        By default::
+
+          _train_seq = [(self._train, self._stop_training, Identity-function)]
+        """)
+
+    def _get_train_seq(self):
+        return [(self._train, self._stop_training, lambda x, *args, **kwargs: x)]
+
     ### additional OnlineNode states
 
     def get_current_train_iteration(self):
@@ -126,16 +170,29 @@ class OnlineNode(Node):
 
     ### check functions
 
+    # The stop-training operation is removed to support continual training
+    # and execution phases.
     def _pre_execution_checks(self, x):
         """This method contains all pre-execution checks.
         It can be used when a subclass defines multiple execution methods.
         """
+        # if training has not started yet, assume we want to train the node
+        if (self.get_current_train_phase() == 0 and
+            not self._train_phase_started):
+            self.train(x)
+
         # control the dimension x
         self._check_input(x)
 
         # check/set params
         self._check_params(x)
 
+        # set the output dimension if necessary
+        if self.output_dim is None:
+            self.output_dim = self.input_dim
+
+    # The stop-training operation is removed to support continual training
+    # and inversion phases.
     def _pre_inversion_checks(self, y):
         """This method contains all pre-inversion checks.
 
@@ -169,7 +226,7 @@ class OnlineNode(Node):
     # they receive the data already casted to the correct type
 
     def _check_params(self, x):
-        # overwrite to check if the parameters are properly defined.
+        # overwrite to check if the learning parameters of the node are properly defined.
         pass
 
     ### User interface to the overwritten methods
@@ -205,13 +262,20 @@ class OnlineNode(Node):
         self._train_phase_started = True
 
         if self.training_type == 'incremental':
-            for i in xrange(x.shape[0]):
+            x = x[:,None,:] # to train sample by sample with 2D shape
+            for _x in x:
                 for _phase in xrange(len(self._train_seq)):
-                    self._train_seq[_phase][0](x[i:i+1], *args, **kwargs)
+                    self._train_seq[_phase][0](_x, *args, **kwargs)
+                    # legacy support for _train_seq.
+                    if (len(self._train_seq[_phase]) > 2):
+                        _x = self._train_seq[_phase][2](_x, *args, **kwargs)
                 self._train_iteration += 1
         else:
             for _phase in xrange(len(self._train_seq)):
                 self._train_seq[_phase][0](x, *args, **kwargs)
+                # legacy support for _train_seq.
+                if (len(self._train_seq[_phase]) > 2):
+                    x = self._train_seq[_phase][2](x, *args, **kwargs)
             self._train_iteration += x.shape[0]
 
     def stop_training(self, *args, **kwargs):
@@ -237,11 +301,15 @@ class OnlineNode(Node):
         if self.get_remaining_train_phase() == 0:
             self._training = False
 
-    ###### adding nodes returns flows and not OnlineFlows
-
+    # adding an OnlineNode returns an OnlineFlow
+    # adding a trainable/non-trainable Node returns a Flow (to keep it consistent with Node add)
+    # adding an OnlineFlow returns an OnlineFlow
+    # adding a Flow returns a Flow.
     def __add__(self, other):
         # check other is a node
-        if isinstance(other, Node):
+        if isinstance(other, OnlineNode):
+            return mdp.OnlineFlow([self, other])
+        elif isinstance(other, Node):
             return mdp.Flow([self, other])
         elif isinstance(other, mdp.Flow):
             flow_copy = other.copy()
