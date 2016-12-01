@@ -142,7 +142,7 @@ class FlowNode(mdp.Node):
             # the nodes in front of the current nodes.
             # using nested scopes here instead of default args, see pep-0227
             def _train(x, *args, **kwargs):
-                if i_node > 0:
+                if _i_node > 0:
                     _node.train(self._flow.execute(x, nodenr=_i_node-1),
                                 *args, **kwargs)
                 else:
@@ -219,58 +219,4 @@ class FlowNode(mdp.Node):
 
     def __iter__(self):
         return self._flow.__iter__()
-
-
-class OnlineFlowNode(FlowNode, mdp.OnlineNode):
-    """OnlineFlowNode wraps an OnlineFlow of OnlineNodes into a single OnlineNode.
-
-    This is handy if you want to use a OnlineFlow where a OnlineNode is required.
-    Additional args and kwargs for train and execute are supported.
-
-    Unlike an OnlineFlow, OnlineFlowNode requires all the nodes to be either
-     an OnlineNode, trained or non-trainable Node.
-
-    All the read-only container slots are supported and are forwarded to the
-    internal flow.
-    """
-    def __init__(self, flow, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
-        super(OnlineFlowNode, self).__init__(flow=flow, input_dim=input_dim, output_dim=output_dim, dtype=dtype)
-        self._check_compatibilitiy(flow)
-        self._cache = flow.cache
-        # numx_rng will not be set through the super call.
-        # Have to set it explicitly here:
-        self.numx_rng = numx_rng
-        # set training type
-        self._set_training_type_from_flow(flow)
-
-    def _check_compatibilitiy(self, flow):
-        if not isinstance(flow, mdp.OnlineFlow):
-            raise TypeError("Flow must be an OnlineFlow type and not %s"%(type(flow)))
-        if not isinstance(flow[-1], mdp.Node):
-            raise TypeError("Flow item must be a Node instance and not %s"%(type(flow[-1])))
-        elif isinstance(flow[-1], mdp.OnlineNode):
-            pass
-        else:
-            # classic mdp Node
-            if flow[-1].is_training():
-                raise TypeError("OnlineFlowNode supports either only a terminal OnlineNode, a trained or a non-trainable Node.")
-
-    def _set_training_type_from_flow(self, flow):
-        for node in flow:
-            if hasattr(node, 'training_type') and (node.training_type == 'incremental'):
-                self._training_type = 'incremental'
-                return
-        self._training_type = 'batch'
-
-    def set_training_type(self, training_type):
-        if self.training_type != training_type:
-            raise mdp.NodeException("Cannot change the training type to %s. It is inferred from "
-                                    "the flow and is set to '%s'. "%(training_type, self.training_type))
-
-    def _set_numx_rng(self, rng):
-        # set the numx_rng for all the nodes to be the same.
-        for node in self._flow:
-            if hasattr(node, 'set_numx_rng'):
-                node.numx_rng = rng
-        self._numx_rng = rng
 
