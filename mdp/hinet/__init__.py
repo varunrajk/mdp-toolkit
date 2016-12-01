@@ -27,7 +27,8 @@ It maps the data according to rectangular overlapping 2d input areas. One can
 then feed the output into a Layer and each Node will get the correct input.
 """
 
-from .flownode import (FlowNode, OnlineFlowNode)
+from .flownode import FlowNode
+from .flownode_online import (OnlineFlowNode, CircularOnlineFlowNode)
 from .layer import Layer, SameInputLayer, CloneLayer
 from .layer_online import OnlineLayer, SameInputOnlineLayer, CloneOnlineLayer
 from .switchboard import (
@@ -47,7 +48,7 @@ from .switchboard_factory import (
     FactoryDoubleRhomb2dSwitchboard
 )
 
-__all__ = ['FlowNode', 'OnlineFlowNode', 'Layer', 'SameInputLayer', 'CloneLayer',
+__all__ = ['FlowNode', 'OnlineFlowNode', 'CircularOnlineFlowNode', 'Layer', 'SameInputLayer', 'CloneLayer',
            'OnlineLayer', 'SameInputOnlineLayer', 'CloneOnlineLayer',
            'Switchboard', 'SwitchboardException', 'ChannelSwitchboard',
            'Rectangular2dSwitchboard', 'Rectangular2dSwitchboardException',
@@ -62,6 +63,7 @@ __all__ = ['FlowNode', 'OnlineFlowNode', 'Layer', 'SameInputLayer', 'CloneLayer'
 from mdp.utils import fixup_namespace
 fixup_namespace(__name__, __all__,
                 ('flownode',
+                 'flownode_online',
                  'layer',
                  'layer_online',
                  'switchboard',
