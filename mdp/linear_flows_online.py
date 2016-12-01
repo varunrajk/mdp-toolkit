@@ -192,6 +192,7 @@ class OnlineFlow(mdp.Flow):
             print("Training nodes %s simultaneously" % (strn))
         self._train_nodes(data_iterables)
 
+        # close training the terminal node only if it is a trainable Node
         if not isinstance(self.flow[-1], mdp.OnlineNode):
             self._close_last_node()
 
@@ -255,7 +256,7 @@ class OnlineFlow(mdp.Flow):
         # append other to self
         if isinstance(other, mdp.Flow):
             flow_copy = list(self.flow).__add__(other.flow)
-            # check iflow compatibility
+            # check OnlineFlow compatibility
             self._check_compatibilitiy(flow_copy)
             # check dimension consistency
             self._check_nodes_consistency(flow_copy)
@@ -264,15 +265,15 @@ class OnlineFlow(mdp.Flow):
         elif isinstance(other, mdp.Node):
             flow_copy = list(self.flow)
             flow_copy.append(other)
-            # check iflow compatibility
+            # check OnlineFlow compatibility
             self._check_compatibilitiy(flow_copy)
             # check dimension consistency
             self._check_nodes_consistency(flow_copy)
             # if no exception was raised, accept the new sequence
             return self.__class__(flow_copy)
         else:
-            err_str = ('can only concatenate iflow or flow with trained (or non-trainable) nodes'
-                       ' (not \'%s\') to iflow' % (type(other).__name__))
+            err_str = ('can only concatenate OnlineFlow or flow with trained (or non-trainable) nodes'
+                       ' (not \'%s\') to OnlineFlow' % (type(other).__name__))
             raise TypeError(err_str)
 
     def __iadd__(self, other):
@@ -326,16 +327,13 @@ class OnlineFlow(mdp.Flow):
 
 
 class CircularOnlineFlow(OnlineFlow):
-    """A 'CircularOnlineFlow' is a cyclic sequence of online/executable nodes that are trained and executed
+    """A 'CircularOnlineFlow' is a cyclic sequence of online/non-trainable nodes that are trained and executed
     together to form a more complex algorithm.  The input and output nodes of the flow can be changed
     at any time using the functions "set_input_node" and "set_output_node".
 
     CircularOnlineFlow also supports training without external input data. In this case, the flow iterates
-    using the previously stored output as an input. However, when some external data is provided, the previously
-    stored outputs are ignored and the nodes are trained in a manner similar to that of an OnlineFlow. The
-    output is stored at the end to enable further iterations. See the doc string of the train method.
-
-    The execute call is functionally similar to the OnlineFlow.
+    using the previously stored output as the input. See the docstring of the train method
+    for more information about different training types.
 
     Crash recovery is optionally available: in case of failure the current
     state of the flow is saved for later inspection.
@@ -350,10 +348,24 @@ class CircularOnlineFlow(OnlineFlow):
     """
 
     def __init__(self, flow, crash_recovery=False, verbose=False):
+        """
+        flow - a list of nodes.
+        flow_iterations - Number of internal train iterations for each data point.
+        """
         super(CircularOnlineFlow, self).__init__(flow, crash_recovery, verbose)
-        self.flow = _deque(flow)
+        self.flow = _deque(flow) # A circular queue of the flow
+
+        # a variable to the set the number of internal flow iteration for each data point.
+        self._flow_iterations = 1
+
+        # set the last node of the list as the default output node.
         self.output_node_idx = len(self.flow)-1
+
+        # a variable to store inputs for internal train iterations
         self._stored_input = None
+
+        # a flag when set ignores the input data (uses stored input instead).
+        self._ignore_input = False
 
     def set_stored_input(self, x):
         if self.flow[0].input_dim is not None:
@@ -364,84 +376,85 @@ class CircularOnlineFlow(OnlineFlow):
     def get_stored_input(self):
         return self._stored_input
 
+    def ignore_input(self, flag):
+        self._ignore_input = flag
+
+    def set_flow_iterations(self, n):
+        self._flow_iterations = n
+
     def _train_nodes(self, data_iterables):
         for x in data_iterables:
-            for nodenr in xrange(len(self.flow)):
-                try:
-                    node = self.flow[nodenr]
-                    if node.is_training():
-                        node.train(x)
-                    x = node.execute(x)
-                except FlowExceptionCR as e:
-                    # this exception was already propagated,
-                    # probably during the execution  of a node upstream in the flow
-                    (exc_type, val) = _sys.exc_info()[:2]
-                    prev = ''.join(_traceback.format_exception_only(e.__class__, e))
-                    prev = prev[prev.find('\n') + 1:]
-                    act = "\nWhile training node #%d (%s):\n" % (nodenr,
-                                                                 str(self.flow[nodenr]))
-                    err_str = ''.join(('\n', 40 * '=', act, prev, 40 * '='))
-                    raise FlowException(err_str)
-                except Exception as e:
-                    # capture any other exception occured during training.
-                    self._propagate_exception(e, nodenr)
-            self._stored_input = x
+            if self._ignore_input:
+                # ignore external input
+                x = self.get_stored_input()
+            # train the loop for 'self.flow_iterations' iterations
+            for _ in xrange(self._flow_iterations):
+                for nodenr in xrange(len(self.flow)):
+                    try:
+                        node = self.flow[nodenr]
+                        if node.is_training():
+                            node.train(x)
+                        x = node.execute(x)
+                    except FlowExceptionCR as e:
+                        # this exception was already propagated,
+                        # probably during the execution  of a node upstream in the flow
+                        (exc_type, val) = _sys.exc_info()[:2]
+                        prev = ''.join(_traceback.format_exception_only(e.__class__, e))
+                        prev = prev[prev.find('\n') + 1:]
+                        act = "\nWhile training node #%d (%s):\n" % (nodenr,
+                                                                     str(self.flow[nodenr]))
+                        err_str = ''.join(('\n', 40 * '=', act, prev, 40 * '='))
+                        raise FlowException(err_str)
+                    except Exception as e:
+                        # capture any other exception occured during training.
+                        self._propagate_exception(e, nodenr)
+                self._stored_input = x
 
-    def _train_check_iterables(self, data_iterables):
-        """Return the data iterable after some checks and sanitizing.
 
-        Note that this method does not distinguish between iterables and
-        iterators, so this must be taken care of later.
-        """
-        # if a scalar is given, training is carried out using the stored inputs.
-        # The scalar denotes the number train iterations.
-        if mdp.numx.isscalar(data_iterables):
-            cnt = data_iterables
-            def iterfn():
-                for i in xrange(cnt):
-                    d = self.get_stored_input()
-                    yield d
-            data_iterables = iterfn()
-
-        # if a single array is given, nodes are trained
-        # incrementally if it is a 2D array or block incrementally if it
-        # is a 3d array (num_blocks, block_size, dim).
-        if isinstance(data_iterables, numx.ndarray):
-            if data_iterables.ndim == 2:
-                data_iterables = data_iterables[:,mdp.numx.newaxis,:]
-            return data_iterables
-
-        # check it it is an iterable
-        if (data_iterables is not None) and (not hasattr(data_iterables, '__iter__')):
-            err = ("data_iterable is not an iterable.")
-            raise FlowException(err)
-
-        return data_iterables
-
-    def train(self, data_iterables=1):
+    def train(self, data_iterables):
         """Train all trainable-nodes in the flow.
 
-        'data_iterables' is either an iterable (including generator-type iterator),
-        a 2D or a 3D numpy array or a scalar. If an iterable is passed, then it must
-        return data arrays to train nodes (so the data arrays are the 'x' for the nodes).
-        If a 2D array is passed that it trains all the nodes incrementally, while if
-        a 3D array is passed, it performs online training in batches (=shape[1]).
-        This is functionally similar to the OnlineFlow.
+        'data_iterables' is a single iterable (including generator-type iterators if
+        the last node has no multiple training phases) that must return data
+        arrays to train nodes (so the data arrays are the 'x' for the nodes).
+        Note that the data arrays are processed by the nodes
+        which are in front of the node that gets trained,
+        so the data dimension must match the input dimension of the first node.
 
-        However, if a scalar (say i) is passed, the flow uses the '_stored_input' to
-        train the nodes in a circular manner for i iterations. At the end of
-        each iteration the '_stored_input' is updated and used for the next iteration.
+        'data_iterables' can also be a 2D or a 3D numpy array. A 2D array trains
+        all the nodes incrementally, while a 3D array supports online training
+        in batches (=shape[1]).
 
         Circular flow does not support passing training arguments.
+
+        There are three ways that the training can proceed based on the values
+        of self._ignore_input (default=False, can be set via 'ignore_input' method) and
+        self._flow_iterations argument (default=1, can be set via 'set_flow_iterations' method).
+
+        1) self._ignore_input = False, self._flow_iterations = 1 (default case)
+
+            This is functionally similar to the standard OnlineFlow.
+            Each data array returned by the data_iterables is used to
+            train the nodes simultaneously.
+
+        2) self._ignore_input = False, self._flow_iterations > 1
+            For each data_array returned by the data_iterables, the flow
+            trains 1 loop with the data_array and 'self._flow_iterations-1'
+            loops with the updating stored inputs.
+
+        3) self._ignore_input = True, self._flow_iterations > 1
+            The data_arrays returned by the data_iterables are ignored, however,
+            for each data_array, the flow trains 'self._flow_iterations' loops
+            with the updating stored inputs.
 
         """
 
         if self.verbose:
             strn = [str(self.flow[i]) for i in xrange(len(self.flow))]
-            if mdp.numx.isscalar(data_iterables):
-                print ("Training nodes %s simultaneously using the stored inputs for %d loops"%(strn, data_iterables))
+            if self._ignore_input:
+                print ("Training nodes %s internally using the stored inputs for %d loops"%(strn, self._flow_iterations))
             else:
-                print("Training nodes %s simultaneously using  the given inputs" % (strn))
+                print("Training nodes %s using the given inputs and %d loops internally for each data point" % (strn, self._flow_iterations))
 
         data_iterables = self._train_check_iterables(data_iterables)
         self._train_nodes(data_iterables)
@@ -491,12 +504,23 @@ class CircularOnlineFlow(OnlineFlow):
     def reset_output_node(self):
         self.output_node_idx = len(self.flow)-1
 
+    ###### private container methods
+
     def __setitem__(self, key, value):
         super(CircularOnlineFlow, self).__setitem__(key, value)
         self.flow = _deque(self.flow)
         if (key.start < self.output_node_idx) and (self.output_node_idx < key.stop()):
             print 'Output node is replaced! Resetting the output node.'
             self.reset_output_node()
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            flow_copy = list(self.flow)
+            flow_slice = flow_copy[key]
+            self._check_nodes_consistency(flow_slice)
+            return self.__class__(flow_slice)
+        else:
+            return self.flow[key]
 
     def __delitem__(self, key):
         super(CircularOnlineFlow, self).__delitem__(key)
@@ -526,7 +550,7 @@ class CircularOnlineFlow(OnlineFlow):
             # if no exception was raised, accept the new sequence
             return self.__class__(flow_copy)
         else:
-            err_str = ('can only concatenate onlineflow or onlinenode'
+            err_str = ('can only concatenate OnlineFlow or OnlineNode'
                        ' (not \'%s\') to CircularOnlineFlow' % (type(other).__name__))
             raise TypeError(err_str)
 
@@ -537,8 +561,8 @@ class CircularOnlineFlow(OnlineFlow):
         elif isinstance(other, mdp.OnlineNode):
             self.flow.append(other)
         else:
-            err_str = ('can only concatenate onlineflow or onlinenode'
-                       ' (not \'%s\') to flow' % (type(other).__name__))
+            err_str = ('can only concatenate OnlineFlow or OnlineNode'
+                       ' (not \'%s\') to CircularOnlineFlow' % (type(other).__name__))
             raise TypeError(err_str)
         self._check_compatibilitiy(self.flow)
         self._check_nodes_consistency(self.flow)
@@ -559,8 +583,8 @@ class CircularOnlineFlow(OnlineFlow):
         """flow.extend(iterable) -- extend flow by appending
         elements from the iterable"""
         if not isinstance(x, mdp.Flow):
-            err_str = ('can only concatenate flow'
-                       ' (not \'%s\') to flow' % (type(x).__name__))
+            err_str = ('can only concatenate OnlineFlow'
+                       ' (not \'%s\') to CircularOnlineFlow' % (type(x).__name__))
             raise TypeError(err_str)
         self[len(self):len(self)] = x
         self._check_nodes_consistency(self.flow)
