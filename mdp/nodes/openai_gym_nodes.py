@@ -16,8 +16,11 @@ class GymNode(mdp.OnlineNode):
     in order to enforce a shared numx_rng between the node and the gym's
     environment.
 
-    This node additionaly provides a stop_rendering method to close
-    gym's rendering window if initialized.
+    The node also provides additional utility methods:
+    'get_random_samples' - generates a required number of output
+    samples for random selected actions, starting from the current state.
+    The env is reset back to the current state.
+    'stop_rendering' - closes gym's rendering window if initialized.
 
     **Instance variables of interest**
 
@@ -29,6 +32,9 @@ class GymNode(mdp.OnlineNode):
 
       ``self.state_type / self.action_type``
          Discrete or continuous state / action space.
+
+      ``self.state_lims / self.action_lims``
+         Upper and lower bounds of state / action space.
 
       ``n_states / n_actions``
          Number of states or actions for discrete types.
@@ -56,8 +62,6 @@ class GymNode(mdp.OnlineNode):
 
         # set a shared numx_rng
         self.numx_rng = numx_rng
-        # set input_dim
-        self._input_dim = 1
 
         # get state dims and shape
         if isinstance(self.env.observation_space, gym.spaces.discrete.Discrete):
@@ -65,11 +69,13 @@ class GymNode(mdp.OnlineNode):
             self.state_dim = 1
             self.state_shape = (1,)
             self.n_states = self.env.observation_space.n
+            self.state_lims = [[0],[self.n_states-1]]
         else:
             self.state_type = 'continuous'
             self.state_shape = self.env.observation_space.shape
             self.state_dim = mdp.numx.product(self.state_shape)
             self.n_states = None
+            self.state_lims = [self.env.observation_space.low, self.env.observation_space.high]
 
         # get action dims
         if isinstance(self.env.action_space, gym.spaces.discrete.Discrete):
@@ -77,11 +83,16 @@ class GymNode(mdp.OnlineNode):
             self.action_dim = 1
             self.action_shape = (1,)
             self.n_actions = self.env.action_space.n
+            self.action_lims = [[0],[self.n_actions-1]]
         else:
             self.action_type = 'continuous'
             self.action_shape = self.env.action_space.shape
             self.action_dim = mdp.numx.product(self.action_shape)
             self.n_actions = None
+            self.action_lims = [self.env.action_space.low, self.env.action_space.high]
+
+        # set input_dim
+        self._input_dim = self.action_dim
 
         # set output dims
         self._output_dim = self.state_dim*2 + self.action_dim + 1 + 1
@@ -147,6 +158,22 @@ class GymNode(mdp.OnlineNode):
         self.cache['info'] = info[-1]
         return y
 
+    # utility methods
+
     def stop_rendering(self):
         # stop gym's rendering if active
         self.env.render(close=True)
+
+    def get_random_samples(self, n=1):
+        # Generates random samples without changing the
+        # current state of the environment.
+        x = mdp.numx.asarray([self.env.action_space.sample() for _ in xrange(n)]).reshape(n, self.input_dim)
+        s_, r, done, info = zip(*self.__steps(x))
+        s_ = mdp.numx.reshape(s_, [len(s_), self.state_dim])
+        s = mdp.numx.vstack((self._s, s_[:-1]))
+        r = mdp.numx.reshape(r, [len(r),1])
+        a = x
+        done = mdp.numx.reshape(done, [len(done),1])
+        y = mdp.numx.hstack((s,s_,a,r,done))
+        return y
+
