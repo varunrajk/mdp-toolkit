@@ -10,34 +10,39 @@ class GymNode(mdp.OnlineNode):
 
     This node is a non-trainable node. The node's execute call takes
     an action array as an input and returns a flattened array of
-    (current state (observation), future state, action, reward, done flag).
+    (current observation (observation), future observation, action, reward, done flag).
 
     The node's metaclass is selected to be an OnlineNode instead of a Node
     in order to enforce a shared numx_rng between the node and the gym's
     environment.
 
     The node also provides additional utility methods:
-    'get_random_samples' - generates a required number of output
-    samples for random selected actions, starting from the current state.
-    The env is reset back to the current state.
     'stop_rendering' - closes gym's rendering window if initialized.
+
+    'get_environment_samples' - generates a required number of output
+    samples for randomly selected actions, starting from the current env state.
+    Note that the env state changes after the method is called.
+    This is equivalent to an execute call without any input.
+
+    'get_random_actions' - returns a random set of valid actions
+    within the environment.
 
     **Instance variables of interest**
 
-      ``self.state_dim / self.action_dim``
-         Flattened state (observation) / action dimension
+      ``self.observation_dim / self.action_dim``
+         Flattened observation  / action dimension
 
-      ``self.state_shape / self.action_shape``
-         The original state shape / action shape. Eg. (100,80,3) for an RGB image.
+      ``self.observation_shape / self.action_shape``
+         The original observation shape / action shape. Eg. (100,80,3) for an RGB image.
 
-      ``self.state_type / self.action_type``
-         Discrete or continuous state / action space.
+      ``self.observation_type / self.action_type``
+         Discrete or continuous observation / action space.
 
-      ``self.state_lims / self.action_lims``
-         Upper and lower bounds of state / action space.
+      ``self.observation_lims / self.action_lims``
+         Upper and lower bounds of observation / action space.
 
-      ``n_states / n_actions``
-         Number of states or actions for discrete types.
+      ``n_observations / n_actions``
+         Number of observations or actions for discrete types.
 
     """
     def __init__(self, env_name, render=False, auto_reset=True, numx_rng=None):
@@ -63,19 +68,19 @@ class GymNode(mdp.OnlineNode):
         # set a shared numx_rng
         self.numx_rng = numx_rng
 
-        # get state dims and shape
+        # get observation dims and shape
         if isinstance(self.env.observation_space, gym.spaces.discrete.Discrete):
-            self.state_type = 'discrete'
-            self.state_dim = 1
-            self.state_shape = (1,)
-            self.n_states = self.env.observation_space.n
-            self.state_lims = [[0],[self.n_states-1]]
+            self.observation_type = 'discrete'
+            self.observation_dim = 1
+            self.observation_shape = (1,)
+            self.n_observations = self.env.observation_space.n
+            self.observation_lims = [[0],[self.n_observations-1]]
         else:
-            self.state_type = 'continuous'
-            self.state_shape = self.env.observation_space.shape
-            self.state_dim = mdp.numx.product(self.state_shape)
-            self.n_states = None
-            self.state_lims = [self.env.observation_space.low, self.env.observation_space.high]
+            self.observation_type = 'continuous'
+            self.observation_shape = self.env.observation_space.shape
+            self.observation_dim = mdp.numx.product(self.observation_shape)
+            self.n_observations = None
+            self.observation_lims = [self.env.observation_space.low, self.env.observation_space.high]
 
         # get action dims
         if isinstance(self.env.action_space, gym.spaces.discrete.Discrete):
@@ -95,10 +100,10 @@ class GymNode(mdp.OnlineNode):
         self._input_dim = self.action_dim
 
         # set output dims
-        self._output_dim = self.state_dim*2 + self.action_dim + 1 + 1
+        self._output_dim = self.observation_dim*2 + self.action_dim + 1 + 1
 
         # get observation
-        self._s = self.env.reset().reshape(1, self.state_dim)
+        self._phi = self.env.reset().reshape(1, self.observation_dim)
 
         # cache to store variables
         self._cache = {'info': None}
@@ -134,27 +139,26 @@ class GymNode(mdp.OnlineNode):
         return False
 
     # environment steps
-
     def __steps(self, x):
         for a in x:
             if self.action_type == 'discrete':
                 a = mdp.numx.asscalar(a)
-            s, r, done, info = self.env.step(a)
+            phi, r, done, info = self.env.step(a)
             if self.render:
                 self.env.render()
             if self.auto_reset and done:
                 self.env.reset()
-            yield s, r, done, info
+            yield phi, r, done, info
 
     def _execute(self, x):
-        s_, r, done, info = zip(*self.__steps(x))
-        s_ = mdp.numx.reshape(s_, [len(s_), self.state_dim])
-        s = mdp.numx.vstack((self._s, s_[:-1]))
-        self._s = s_[-1:]
+        phi_, r, done, info = zip(*self.__steps(x.astype('int')))
+        phi_ = mdp.numx.reshape(phi_, [len(phi_), self.observation_dim])
+        phi = mdp.numx.vstack((self._phi, phi_[:-1]))
+        self._phi = phi_[-1:]
         r = mdp.numx.reshape(r, [len(r),1])
         a = x
         done = mdp.numx.reshape(done, [len(done),1])
-        y = mdp.numx.hstack((s,s_,a,r,done))
+        y = mdp.numx.hstack((phi,phi_,a,r,done))
         self.cache['info'] = info[-1]
         return y
 
@@ -164,16 +168,10 @@ class GymNode(mdp.OnlineNode):
         # stop gym's rendering if active
         self.env.render(close=True)
 
-    def get_random_samples(self, n=1):
-        # Generates random samples without changing the
-        # current state of the environment.
-        x = mdp.numx.asarray([self.env.action_space.sample() for _ in xrange(n)]).reshape(n, self.input_dim)
-        s_, r, done, info = zip(*self.__steps(x))
-        s_ = mdp.numx.reshape(s_, [len(s_), self.state_dim])
-        s = mdp.numx.vstack((self._s, s_[:-1]))
-        r = mdp.numx.reshape(r, [len(r),1])
-        a = x
-        done = mdp.numx.reshape(done, [len(done),1])
-        y = mdp.numx.hstack((s,s_,a,r,done))
-        return y
+    def get_random_actions(self, n=1):
+        return mdp.numx.asarray([self.env.action_space.sample() for _ in xrange(n)]).reshape(n, self.input_dim)
+
+    def get_environment_samples(self, n=1):
+        # Generates random environment samples
+        return self.execute(self.get_random_actions(n))
 
