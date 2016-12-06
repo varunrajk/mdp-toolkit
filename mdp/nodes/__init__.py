@@ -39,6 +39,8 @@ from .hsfa_nodes import HSFANode, HSFAPoolNode
 from .explorer_nodes import (DiscreteExplorerNode, ContinuousExplorerNode, EpsilonGreedyDiscreteExplorerNode,
                              EpsilonGreedyContinuousExplorerNode, BoltzmannDiscreteExplorerNode, GaussianContinuousExplorereNode,
                              )
+from .grid_processing_nodes import GridProcessingNode
+from .basis_function_nodes import BasisFunctionNode
 
 __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
            'CuBICANode', 'TDSEPNode', 'JADENode', 'SFANode', 'SFA2Node',
@@ -58,7 +60,8 @@ __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
             'MovingAvgNode', 'MovingTimeDiffNode', 'CCIPCANode', 'CCIPCAWhiteningNode', 'MCANode',
            'IncSFANode', 'HSFANode', 'HSFAPoolNode', 'NumxBufferNode',
            'DiscreteExplorerNode', 'ContinuousExplorerNode', 'EpsilonGreedyDiscreteExplorerNode',
-           'EpsilonGreedyContinuousExplorerNode', 'BoltzmannDiscreteExplorerNode', 'GaussianContinuousExplorereNode'
+           'EpsilonGreedyContinuousExplorerNode', 'BoltzmannDiscreteExplorerNode', 'GaussianContinuousExplorereNode',
+           'BasisFunctionNode', 'GridProcessingNode'
            ]
 
 
@@ -128,5 +131,7 @@ utils.fixup_namespace(__name__, __all__ + ['ICANode'],
                        'hsfa_nodes',
                        'pg_nodes',
                        'explorer_nodes',
-                       'openai_gym_nodes'
+                       'openai_gym_nodes',
+                       'basis_function_nodes',
+                       'grid_processing_nodes'
                         ))
