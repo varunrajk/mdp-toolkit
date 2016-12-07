@@ -1,9 +1,14 @@
-
 from builtins import str
 import mdp
 from mdp import numx
-from .linear_flows import  FlowException, FlowExceptionCR, _sys, _traceback
+from .linear_flows import FlowException, FlowExceptionCR, _sys, _traceback
 from collections import deque as _deque
+
+
+class OnlineFlowException(mdp.MDPException):
+    """Base class for exceptions in Flow subclasses."""
+    pass
+
 
 class OnlineFlow(mdp.Flow):
     """An 'OnlineFlow' is a sequence of online/executable nodes that are trained and executed
@@ -58,8 +63,8 @@ class OnlineFlow(mdp.Flow):
         return self._cache
 
     def _train_node(self, data_iterable, nodenr):
-        err_str = ('Not used in %s'%str(type(self).__name__))
-        FlowException(err_str)
+        err_str = ('Not used in %s' % str(type(self).__name__))
+        OnlineFlowException(err_str)
 
     def _get_required_train_args_from_flow(self, flow):
         _train_arg_keys_list = [self._get_required_train_args(node) for node in flow]
@@ -74,8 +79,8 @@ class OnlineFlow(mdp.Flow):
                 x = x[0]
                 if len(args) != len(self.flow):
                     err = ("Wrong number of argument-tuples provided by " +
-                           "the iterable (%d needed, %d given).\n" %(len(self.flow), len(args)))
-                    raise FlowException(err)
+                           "the iterable (%d needed, %d given).\n" % (len(self.flow), len(args)))
+                    raise OnlineFlowException(err)
             else:
                 args = ()
             empty_iterator = False
@@ -96,7 +101,7 @@ class OnlineFlow(mdp.Flow):
                                    (len(self._train_arg_keys_list[nodenr]), len(arg)) +
                                    "List of required argument keys: " +
                                    str(self._train_arg_keys_list[nodenr]))
-                            raise FlowException(err)
+                            raise OnlineFlowException(err)
                         if node.is_training():
                             node.train(x, *arg)
                     else:
@@ -124,11 +129,11 @@ class OnlineFlow(mdp.Flow):
                            "could not be repeated for the "
                            "second training phase, you probably "
                            "provided an iterator instead of an "
-                           "iterable." )
+                           "iterable.")
                 raise FlowException(err_str)
             else:
                 err_str = ("The training data iterator "
-                           "is empty." )
+                           "is empty.")
                 raise FlowException(err_str)
         self._stop_training_hook()
         if self.flow[-1].get_remaining_train_phase() > 1:
@@ -147,16 +152,15 @@ class OnlineFlow(mdp.Flow):
         # is a 3d array (num_blocks, block_size, dim).
         if isinstance(data_iterables, numx.ndarray):
             if data_iterables.ndim == 2:
-                data_iterables = data_iterables[:,mdp.numx.newaxis,:]
+                data_iterables = data_iterables[:, mdp.numx.newaxis, :]
             return data_iterables
 
         # check it it is an iterable
         if (data_iterables is not None) and (not hasattr(data_iterables, '__iter__')):
-            err = ("data_iterable is not an iterable.")
+            err = "data_iterable is not an iterable."
             raise FlowException(err)
 
         return data_iterables
-
 
     def train(self, data_iterables):
         """Train all trainable nodes in the flow.
@@ -189,19 +193,19 @@ class OnlineFlow(mdp.Flow):
 
         if self.verbose:
             strn = [str(self.flow[i]) for i in xrange(len(self.flow))]
-            print("Training nodes %s simultaneously" % (strn))
+            print("Training nodes %s simultaneously" % strn)
         self._train_nodes(data_iterables)
 
         # close training the terminal node only if it is a trainable Node
         if not isinstance(self.flow[-1], mdp.OnlineNode):
             self._close_last_node()
 
-    ###### private container methods
+    # private container methods
 
     def _check_value_type_is_compatible(self, value):
         # onlinenodes, trained and non-trainable nodes are compatible
         if not isinstance(value, mdp.Node):
-            raise TypeError("flow item must be a Node instance and not %s"%(type(value)))
+            raise TypeError("flow item must be a Node instance and not %s" % type(value))
         elif isinstance(value, mdp.OnlineNode):
             pass
         else:
@@ -218,9 +222,9 @@ class OnlineFlow(mdp.Flow):
         _cache = {}
         for i, node in enumerate(flow):
             if not hasattr(node, 'cache'):
-                _cache['node#%d' % (i)] = {}
+                _cache['node#%d' % i] = {}
             else:
-                _cache['node#%d' % (i)] = node.cache
+                _cache['node#%d' % i] = node.cache
         return _cache
 
     def __setitem__(self, key, value):
@@ -273,7 +277,7 @@ class OnlineFlow(mdp.Flow):
             return self.__class__(flow_copy)
         else:
             err_str = ('can only concatenate OnlineFlow or flow with trained (or non-trainable) nodes'
-                       ' (not \'%s\') to OnlineFlow' % (type(other).__name__))
+                       ' (not \'%s\') to OnlineFlow' % type(other).__name__)
             raise TypeError(err_str)
 
     def __iadd__(self, other):
@@ -284,7 +288,7 @@ class OnlineFlow(mdp.Flow):
             self.flow.append(other)
         else:
             err_str = ('can only concatenate flow or node'
-                       ' (not \'%s\') to flow' % (type(other).__name__))
+                       ' (not \'%s\') to flow' % type(other).__name__)
             raise TypeError(err_str)
         self._check_compatibilitiy(self.flow)
         self._check_nodes_consistency(self.flow)
@@ -292,7 +296,7 @@ class OnlineFlow(mdp.Flow):
         self._train_arg_keys_list, self._train_args_needed_list = self._get_required_train_args_from_flow(self.flow)
         return self
 
-    ###### public container methods
+    # public container methods
 
     def append(self, x):
         """flow.append(node) -- append node to flow end"""
@@ -307,7 +311,7 @@ class OnlineFlow(mdp.Flow):
         elements from the iterable"""
         if not isinstance(x, mdp.Flow):
             err_str = ('can only concatenate flow'
-                       ' (not \'%s\') to flow' % (type(x).__name__))
+                       ' (not \'%s\') to flow' % type(x).__name__)
             raise TypeError(err_str)
         self[len(self):len(self)] = x
         self._check_nodes_consistency(self.flow)
@@ -324,6 +328,9 @@ class OnlineFlow(mdp.Flow):
         self._train_arg_keys_list, self._train_args_needed_list = self._get_required_train_args_from_flow(self.flow)
 
 
+class CircularOnlineFlowException(mdp.MDPException):
+    """Base class for exceptions in Flow subclasses."""
+    pass
 
 
 class CircularOnlineFlow(OnlineFlow):
@@ -353,13 +360,13 @@ class CircularOnlineFlow(OnlineFlow):
         flow_iterations - Number of internal train iterations for each data point.
         """
         super(CircularOnlineFlow, self).__init__(flow, crash_recovery, verbose)
-        self.flow = _deque(flow) # A circular queue of the flow
+        self.flow = _deque(flow)  # A circular queue of the flow
 
         # a variable to the set the number of internal flow iteration for each data point.
         self._flow_iterations = 1
 
         # set the last node of the list as the default output node.
-        self.output_node_idx = len(self.flow)-1
+        self.output_node_idx = len(self.flow) - 1
 
         # a variable to store inputs for internal train iterations
         self._stored_input = None
@@ -370,7 +377,8 @@ class CircularOnlineFlow(OnlineFlow):
     def set_stored_input(self, x):
         if self.flow[0].input_dim is not None:
             if x.shape[-1] != self.flow[0].input_dim:
-                raise FlowException("Dimension mismatch! should be %d, given %d"%(self.flow[0].input_dim, x.shape[-1]))
+                raise CircularOnlineFlowException(
+                    "Dimension mismatch! should be %d, given %d" % (self.flow[0].input_dim, x.shape[-1]))
             self._stored_input = x
 
     def get_stored_input(self):
@@ -409,7 +417,6 @@ class CircularOnlineFlow(OnlineFlow):
                         # capture any other exception occured during training.
                         self._propagate_exception(e, nodenr)
                 self._stored_input = x
-
 
     def train(self, data_iterables):
         """Train all trainable-nodes in the flow.
@@ -452,13 +459,14 @@ class CircularOnlineFlow(OnlineFlow):
         if self.verbose:
             strn = [str(self.flow[i]) for i in xrange(len(self.flow))]
             if self._ignore_input:
-                print ("Training nodes %s internally using the stored inputs for %d loops"%(strn, self._flow_iterations))
+                print ("Training nodes %s internally using the stored inputs "
+                       "for %d loops" % (strn, self._flow_iterations))
             else:
-                print("Training nodes %s using the given inputs and %d loops internally for each data point" % (strn, self._flow_iterations))
+                print("Training nodes %s using the given inputs and %d loops "
+                      "internally for each data point" % (strn, self._flow_iterations))
 
         data_iterables = self._train_check_iterables(data_iterables)
         self._train_nodes(data_iterables)
-
 
     def execute(self, iterable, nodenr=None):
         """Process the data through all nodes between input and the output node.
@@ -472,11 +480,10 @@ class CircularOnlineFlow(OnlineFlow):
             nodenr = self.output_node_idx
         return super(CircularOnlineFlow, self).execute(iterable, nodenr)
 
-
     def _inverse_seq(self, x):
-        #Successively invert input data 'x' through all nodes backwards from the output node to the input node.
+        # Successively invert input data 'x' through all nodes backwards from the output node to the input node.
         flow = self.flow[:self.output_node_idx]
-        for i in range(len(flow)-1, -1, -1):
+        for i in range(len(flow) - 1, -1, -1):
             try:
                 x = flow[i].inverse(x)
             except Exception as e:
@@ -485,26 +492,25 @@ class CircularOnlineFlow(OnlineFlow):
 
     def set_input_node(self, node_idx):
         if (node_idx > len(self.flow)) or (node_idx < 0):
-            raise FlowException("Accepted 'node_idx' values: 0 <= node_idx < %d, given %d"%(len(self.flow), node_idx))
+            raise CircularOnlineFlowException(
+                "Accepted 'node_idx' values: 0 <= node_idx < %d, given %d" % (len(self.flow), node_idx))
         self.flow.rotate(-node_idx)
-        self.output_node_idx = (self.output_node_idx-node_idx)%len(self.flow)
-        self._input_dim = self.flow[0].input_dim
+        self.output_node_idx = (self.output_node_idx - node_idx) % len(self.flow)
         self._cache = self._get_cache_from_flow(self.flow)
 
     def set_output_node(self, node_idx):
         if (node_idx > len(self.flow)) or (node_idx < 0):
-            raise FlowException("Accepted 'node_idx' values: 0 <= node_idx < %d, given %d"%(len(self.flow), node_idx))
+            raise CircularOnlineFlowException(
+                "Accepted 'node_idx' values: 0 <= node_idx < %d, given %d" % (len(self.flow), node_idx))
         self.output_node_idx = node_idx
-        self._output_dim = self.flow[self.output_node_idx].output_dim
-
 
     def _check_compatibilitiy(self, flow):
         [self._check_value_type_is_compatible(item) for item in flow]
 
     def reset_output_node(self):
-        self.output_node_idx = len(self.flow)-1
+        self.output_node_idx = len(self.flow) - 1
 
-    ###### private container methods
+    # private container methods
 
     def __setitem__(self, key, value):
         super(CircularOnlineFlow, self).__setitem__(key, value)
@@ -529,7 +535,7 @@ class CircularOnlineFlow(OnlineFlow):
             print 'Output node deleted! Resetting the output node to the default last node.'
             self.reset_output_node()
         elif self.output_node_idx > key.stop():
-            self.set_output_node(self.output_node_idx-key.stop+key.start)
+            self.set_output_node(self.output_node_idx - key.stop + key.start)
 
     def __add__(self, other):
         # append other to self
@@ -551,7 +557,7 @@ class CircularOnlineFlow(OnlineFlow):
             return self.__class__(flow_copy)
         else:
             err_str = ('can only concatenate OnlineFlow or OnlineNode'
-                       ' (not \'%s\') to CircularOnlineFlow' % (type(other).__name__))
+                       ' (not \'%s\') to CircularOnlineFlow' % type(other).__name__)
             raise TypeError(err_str)
 
     def __iadd__(self, other):
@@ -562,15 +568,14 @@ class CircularOnlineFlow(OnlineFlow):
             self.flow.append(other)
         else:
             err_str = ('can only concatenate OnlineFlow or OnlineNode'
-                       ' (not \'%s\') to CircularOnlineFlow' % (type(other).__name__))
+                       ' (not \'%s\') to CircularOnlineFlow' % type(other).__name__)
             raise TypeError(err_str)
         self._check_compatibilitiy(self.flow)
         self._check_nodes_consistency(self.flow)
         self._cache = self._get_cache_from_flow(self.flow)
         return self
 
-
-    ###### public container methods
+    # public container methods
 
     def append(self, x):
         """flow.append(node) -- append node to flow end"""
@@ -584,7 +589,7 @@ class CircularOnlineFlow(OnlineFlow):
         elements from the iterable"""
         if not isinstance(x, mdp.Flow):
             err_str = ('can only concatenate OnlineFlow'
-                       ' (not \'%s\') to CircularOnlineFlow' % (type(x).__name__))
+                       ' (not \'%s\') to CircularOnlineFlow' % type(x).__name__)
             raise TypeError(err_str)
         self[len(self):len(self)] = x
         self._check_nodes_consistency(self.flow)
@@ -599,6 +604,4 @@ class CircularOnlineFlow(OnlineFlow):
         self._cache = self._get_cache_from_flow(self.flow)
 
         if self.output_node_idx >= i:
-            self.set_output_node(self.output_node_idx+1)
-
-
+            self.set_output_node(self.output_node_idx + 1)
