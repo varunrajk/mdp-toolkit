@@ -986,10 +986,8 @@ class TransformerNode(mdp.Node):
     def _resize(self, x, size_xy):
         try:
             from cv2 import resize
-            x = x.reshape(x.shape[0], *self.input_shape)
             rimg = [(resize(_x, size_xy[::-1])) for _x in x]
             rimg = mdp.numx.asarray(rimg)
-            rimg = rimg.reshape(x.shape[0], mdp.numx.product(x.shape[1:]))
         except ImportError:
             raise mdp.NodeException("OpenCV python bindings were not found. Install OpenCV to resize images.")
         return rimg
