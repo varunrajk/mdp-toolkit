@@ -5,14 +5,19 @@ from builtins import str
 from builtins import range
 from past.utils import old_div
 from builtins import object
+import inspect as _inspect
 
 __docformat__ = "restructuredtext en"
 
 import mdp
-from mdp import numx, utils, Node, NodeException, PreserveDimNode
+from mdp import numx, utils, Node, NodeException, PreserveDimNode, config
 
 import pickle as pickle
 import pickle as real_pickle
+
+if config.has_sklearn:
+   from sklearn import preprocessing
+
 
 class NumxBufferNode(mdp.Node):
     def __init__(self, buffer_size, input_dim=None, output_dim=None, dtype=None):
@@ -846,3 +851,196 @@ class AdaptiveCutoffNode(HistogramNode):
         if self.upper_bounds is not None:
             x = numx.where(x <= self.upper_bounds, x, self.upper_bounds)
         return x
+
+
+class TransformerNode(mdp.Node):
+    """
+    TransformerNode applies a sequence of transformations to the input.
+
+    This node can be used to transform data processed between the nodes in a Flow.
+
+    To add other transformation methods, subclasses can overwrite the method
+    '_get_transform_fns' that returns a dict mapping labels to
+    transformation methods.
+
+    The output data is reshaped back to 2D array.
+
+    """
+    def __init__(self, input_shape, transform_seq=None, transform_seq_args=None, input_dim=None, output_dim=None, dtype=None):
+        """
+        input_shape - The actual shape of the input
+        transform_seq - A list of strings, where each string represents a label for the transformation.
+                        Supported transformation:
+                            'transpose' - transpose data dimensions
+                            'mean' - remove mean over axis=0
+                            'resize' - resize data dims (for image data). Requires OpenCV python bindings.
+                            'img_255_1' - scales uint img data to float values between [0,1]
+                            'gray' - converts to grayscale images.
+
+        trasnform_seq_args - A list of required arguments tuples for each transformation, ordered according to
+                            the transform_seq.
+        """
+        super(TransformerNode, self).__init__(input_dim=input_dim, output_dim=output_dim, dtype=dtype)
+
+        self.input_shape = input_shape
+        self._input_dim = mdp.numx.product(self.input_shape)
+        self._transform_seq = None
+        self._transform_seq_args = None
+        self._transform_fns = self._get_transform_fns()
+        self.transform_seq = transform_seq
+        self.transform_seq_args = transform_seq_args
+
+        self._shape_buffer = input_shape
+
+    # properties
+
+    @property
+    def transform_seq(self):
+        return self._transform_seq
+
+    @transform_seq.setter
+    def transform_seq(self, seq):
+        if seq is None:
+            return
+
+        if self._transform_seq is not None:
+            raise mdp.NodeException("'transform_seq' is already set to %s, "
+                                    "given %s." % (str(self._transform_seq), str(seq)))
+
+        # check transform sequence
+        for elem in seq:
+            if elem not in self._transform_fns.keys():
+                mdp.NodeException("Unrecognized transform fn. Supported ones: %s" % str(self._transform_fns.keys()))
+        self._transform_seq = seq
+
+    @property
+    def transform_seq_args(self):
+        return self._transform_seq_args
+
+    @transform_seq_args.setter
+    def transform_seq_args(self, seq_args):
+        if seq_args is None:
+            return
+
+        if self._transform_seq_args is not None:
+            raise mdp.NodeException("'transform_seq_args' is already set to "
+                                    "%s, given %s." % (str(self._transform_seq_args), str(seq_args)))
+
+        # check transform sequence args
+        if (not isinstance(seq_args, list)) and (not isinstance(seq_args, tuple)):
+            raise mdp.NodeException("'transform_seq_args' must be a list and not %s." % str(type(seq_args)))
+        if len(self.transform_seq) != len(seq_args):
+            raise mdp.NodeException("Wrong set of 'transform_seq_args', required "
+                                    "%d given %d." % (len(self.transform_seq), len(seq_args)))
+        for i, arg in enumerate(seq_args):
+            key = self.transform_seq[i]
+            fn_arg_keys = self._get_required_fn_args(key)
+            fn_args_needed = bool(len(fn_arg_keys))
+            if fn_args_needed:
+                if len(arg) != len(fn_arg_keys):
+                    err = ("Wrong number of arguments provided for the %s function " % str(key) +
+                           "(%d needed, %d given).\n" % (len(fn_arg_keys), len(arg)) +
+                           "List of required argument keys: " + str(fn_arg_keys))
+                    raise mdp.NodeException(err)
+            else:
+                seq_args[i] = ()
+        self._transform_seq_args = seq_args
+
+    def _get_transform_fns(self):
+        d = {'transpose': self._transpose, 'remove_mean': self._remove_mean, 'resize': self._resize, 'img_255_1': self._img_255_1,
+         'gray': self._gray, 'to_2d': self._to_2d, 'set_shape': self._set_shape}
+
+        if config.has_sklearn:
+            _skd = {_key: getattr(preprocessing, _key) for _key in filter(lambda a: a[0].islower(), preprocessing.__all__)}
+            d.update(_skd)
+        return d
+
+    def _get_required_fn_args(self, fn_name):
+        """Return arguments for transform function 'fn_name'
+        Argumentes that have a default value are ignored.
+        """
+        train_arg_spec = _inspect.getargspec(self._transform_fns[fn_name])
+        if train_arg_spec[0][0] == 'self':
+            train_arg_keys = train_arg_spec[0][2:]  # ignore self, x
+        else:
+            # staticmethod
+            train_arg_keys = train_arg_spec[0][1:]  # ignore just x
+        if train_arg_spec[3]:
+            # subtract arguments with a default value
+            train_arg_keys = train_arg_keys[:-len(train_arg_spec[3])]
+        return train_arg_keys
+
+    def _get_supported_dtypes(self):
+        return mdp.utils.get_dtypes('AllInteger') + mdp.utils.get_dtypes('Float')
+
+    # transformation methods
+
+    @staticmethod
+    def _transpose(x):
+        return mdp.numx.rollaxis(x.T, -1)
+
+    @staticmethod
+    def _remove_mean(x):
+        return x - x.mean(axis=0)
+
+    def _resize(self, x, size_xy):
+        try:
+            from cv2 import resize
+            x = x.reshape(x.shape[0], *self.input_shape)
+            rimg = [(resize(_x, size_xy[::-1])) for _x in x]
+            rimg = mdp.numx.asarray(rimg)
+            rimg = rimg.reshape(x.shape[0], mdp.numx.product(x.shape[1:]))
+        except ImportError:
+            raise mdp.NodeException("OpenCV python bindings were not found. Install OpenCV to resize images.")
+        return rimg
+
+    @staticmethod
+    def _img_255_1(x):
+        x = x.astype('float')
+        x = old_div(x, 255.)
+        return x
+
+    @staticmethod
+    def _gray(x):
+        return x.mean(axis=-1)
+
+    def _to_2d(self, x):
+        if x.ndim == 2:
+            return x
+        self._shape_buffer = x.shape[1:]
+        return x.reshape(x.shape[0], mdp.numx.product(x.shape[1:]))
+
+    def _set_shape(self, x, shape=None):
+        if shape is None:
+            # check if it can be reshapes with the stored shape buffer
+            if mdp.numx.product(self._shape_buffer) == mdp.numx.product(x.shape[1:]):
+                return x.reshape(x.shape[0], *self._shape_buffer)
+            else:
+                raise mdp.NodeException("Cannot reshape to the store shape buffer. Provide the desired shape.")
+        else:
+            return x.reshape(x.shape[0], *shape)
+
+    # Node methods
+
+    @staticmethod
+    def is_trainable():
+        return False
+
+    @staticmethod
+    def is_invertible():
+        return False
+
+    def _execute(self, x):
+        if self.transform_seq is None:
+            # no transformations
+            return x
+        elif self.transform_seq_args is None:
+            # checks if no args needed
+            self.transform_seq_args = [None] * len(self.transform_seq)
+
+        x = self._set_shape(x, self.input_shape)
+        for i, fn_name in enumerate(self.transform_seq):
+            x = self._transform_fns[fn_name](x, *self.transform_seq_args[i])
+        return self._to_2d(x)
+
+
