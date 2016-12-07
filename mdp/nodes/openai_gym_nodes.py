@@ -142,7 +142,7 @@ class GymNode(mdp.OnlineNode):
     def __steps(self, x):
         for a in x:
             if self.action_type == 'discrete':
-                a = mdp.numx.asscalar(a)
+                a = int(mdp.numx.asscalar(a))
             phi, r, done, info = self.env.step(a)
             if self.render:
                 self.env.render()
@@ -151,7 +151,7 @@ class GymNode(mdp.OnlineNode):
             yield phi, r, done, info
 
     def _execute(self, x):
-        phi_, r, done, info = zip(*self.__steps(x.astype('int')))
+        phi_, r, done, info = zip(*self.__steps(x))
         phi_ = mdp.numx.reshape(phi_, [len(phi_), self.observation_dim])
         phi = mdp.numx.vstack((self._phi, phi_[:-1]))
         self._phi = phi_[-1:]
