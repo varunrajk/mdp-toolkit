@@ -339,18 +339,23 @@ def test_online_flow_node():
     rng = mdp.numx_rand.RandomState(seed=1)
     flow1 = OnlineFlow([BogusNode(input_dim=2, output_dim=2),
                         BogusOnlineNode(input_dim=2, output_dim=2),
+                        BogusNode(input_dim=2, output_dim=2),
                         BogusOnlineDiffDimNode(input_dim=2, output_dim=4),
-                        BogusNode(input_dim=4, output_dim=4)])
+                        ])
     node1 = mdp.hinet.OnlineFlowNode(flow1, numx_rng=rng)
 
     flow2 = OnlineFlow([BogusNode(input_dim=2, output_dim=2),
                         BogusOnlineNode(input_dim=2, output_dim=2),
+                        BogusNode(input_dim=2, output_dim=2),
                         BogusOnlineDiffDimNode(input_dim=2, output_dim=4),
-                        BogusNode(input_dim=4, output_dim=4)])
+                        ])
     node2 = mdp.hinet.FlowNode(flow2)
 
     # number of training phases = number of trainable nodes + 1(if the first node is not-trainable).
     assert(node1.get_remaining_train_phase()==3)
+
+    for seq in node1._train_seq:
+        print [fn.__name__ for fn in seq]
 
     inp = numx.ones((2,2))
     out1 = node1(inp)
@@ -358,14 +363,14 @@ def test_online_flow_node():
     assert_array_equal(out1, out2)
     assert(node1.is_training())
     assert(flow1[1].is_training())
-    assert(flow1[2].is_training())
+    assert(flow1[3].is_training())
     assert (not node2.is_training())
     for _n in node2.flow:
         assert(not _n.is_training())
 
     assert(node1.numx_rng == rng)
     assert(node1.numx_rng == node1._flow[1].numx_rng)
-    assert(node1.numx_rng == node1._flow[2].numx_rng)
+    assert(node1.numx_rng == node1._flow[3].numx_rng)
 
 
     flow = mdp.OnlineFlow([BogusNode(),
@@ -388,149 +393,151 @@ def test_online_flow_node():
 
 
 
-# def test_circular_online_flow_node():
-#
-#     # default setting (= onlineflownode)
-#     flow1 = mdp.CircularOnlineFlow([BogusNode(),
-#                                 BogusOnlineNodeReturnSum(),
-#                                 BogusNode(),
-#                                 BogusOnlineNodeReturnSum()])
-#
-#     node1 = mdp.hinet.CircularOnlineFlowNode(flow1, numx_rng=mdp.numx_rand.RandomState(seed=1))
-#     flow2 = mdp.CircularOnlineFlow([BogusNode(),
-#                                 BogusOnlineNodeReturnSum(),
-#                                 BogusNode(),
-#                                 BogusOnlineNodeReturnSum()])
-#
-#     node2 = mdp.hinet.OnlineFlowNode(flow2, numx_rng=mdp.numx_rand.RandomState(seed=1))
-#
-#     assert(node1.get_remaining_train_phase()==node2.get_remaining_train_phase())
-#     assert(node1._stored_input is None)
-#     inp = numx.ones((1, 2))
-#     out1 = node1(inp) # One train and execute
-#     out2 = node2(inp) # One train and execute
-#     assert_array_equal(out1, out2)
-#     assert_array_equal(node1._stored_input, out2)
-#
-#
-#     # default setting with different output_node. Check stored_input
-#     flow1 = mdp.CircularOnlineFlow([BogusNode(),
-#                                 BogusOnlineNodeReturnSum(),
-#                                 BogusNode(),
-#                                 BogusOnlineNodeReturnSum()])
-#     flow1.set_output_node(2)
-#     node1 = mdp.hinet.CircularOnlineFlowNode(flow1, numx_rng=mdp.numx_rand.RandomState(seed=1))
-#     flow2 = mdp.CircularOnlineFlow([BogusNode(),
-#                                 BogusOnlineNodeReturnSum(),
-#                                 BogusNode(),
-#                                 BogusOnlineNodeReturnSum()])
-#
-#     node2 = mdp.hinet.OnlineFlowNode(flow2, numx_rng=mdp.numx_rand.RandomState(seed=1))
-#
-#     assert(node1.get_remaining_train_phase()==node2.get_remaining_train_phase())
-#     assert(node1._stored_input is None)
-#     inp = numx.ones((1, 2))
-#     out1 = node1(inp) # One train and execute
-#     out2 = node2(inp) # One train and execute
-#     assert_array_equal(node1._stored_input, out2)
-#     assert (not (out1 != out2).all())
-#
-#
-#     # internal training (check errors without stored inputs)
-#     flow1 = mdp.CircularOnlineFlow([BogusNode(),
-#                                 BogusOnlineNodeReturnSum(),
-#                                 BogusNode(),
-#                                 BogusOnlineNodeReturnSum()])
-#     flow1.ignore_input(True)
-#     node1 = mdp.hinet.CircularOnlineFlowNode(flow1, numx_rng=mdp.numx_rand.RandomState(seed=1))
-#     flow2 = mdp.CircularOnlineFlow([BogusNode(),
-#                                 BogusOnlineNodeReturnSum(),
-#                                 BogusNode(),
-#                                 BogusOnlineNodeReturnSum()])
-#     node2 = mdp.hinet.OnlineFlowNode(flow2, numx_rng=mdp.numx_rand.RandomState(seed=1))
-#
-#     assert(node1.get_remaining_train_phase()==node2.get_remaining_train_phase())
-#     assert(node1._stored_input is None)
-#     inp = numx.ones((1, 2))
-#     try:
-#         node1.train(inp)
-#         raise Exception("node trained internally without any stored inputs.")
-#     except mdp.TrainingException: pass
-#
-#
-#     # internal training with stored inputs. (check 1 loop output with default output)
-#     flow1 = mdp.CircularOnlineFlow([BogusNode(),
-#                                 BogusOnlineNodeReturnSum(),
-#                                 BogusNode(),
-#                                 BogusOnlineNodeReturnSum()])
-#     flow1.ignore_input(True)
-#     node1 = mdp.hinet.CircularOnlineFlowNode(flow1, numx_rng=mdp.numx_rand.RandomState(seed=1))
-#     flow2 = mdp.CircularOnlineFlow([BogusNode(),
-#                                 BogusOnlineNodeReturnSum(),
-#                                 BogusNode(),
-#                                 BogusOnlineNodeReturnSum()])
-#     node2 = mdp.hinet.OnlineFlowNode(flow2, numx_rng=mdp.numx_rand.RandomState(seed=1))
-#
-#     inp = numx.ones((1, 2))
-#     node1.set_stored_input(inp)
-#     out1 = node1(inp) # One train and execute
-#     out2 = node2(inp) # One train and execute
-#     assert_array_equal(out1, out2)
-#     assert_array_equal(node1._stored_input, out2)
-#
-#
-#     # internal training with multiple iterations.
-#     flow1 = mdp.CircularOnlineFlow([BogusNode(),
-#                                 BogusOnlineNodeReturnSum(),
-#                                 BogusNode(),
-#                                 BogusOnlineNodeReturnSum()])
-#     flow1.ignore_input(True)
-#     flow_iters = 5
-#     flow1.set_flow_iterations(flow_iters)
-#     node1 = mdp.hinet.CircularOnlineFlowNode(flow1, numx_rng=mdp.numx_rand.RandomState(seed=1))
-#     flow2 = mdp.CircularOnlineFlow([BogusNode(),
-#                                 BogusOnlineNodeReturnSum(),
-#                                 BogusNode(),
-#                                 BogusOnlineNodeReturnSum()])
-#     node2 = mdp.hinet.OnlineFlowNode(flow2, numx_rng=mdp.numx_rand.RandomState(seed=1))
-#
-#     assert(node1.get_remaining_train_phase()==len(flow1)*flow_iters)
-#
-#     inp = numx.ones((1, 2))
-#     node1.set_stored_input(inp)
-#     out1 = node1(inp) # One train (includes 3 iterations) and execute
-#
-#     x = inp
-#     for _ in xrange(flow_iters):
-#         node2.train(x)
-#         x = node2.execute(x)
-#
-#     assert_array_equal(out1, x)
-#     assert_array_equal(node1._stored_input, x)
-#
-#
-#     #external training with iterations.
-#     flow1 = mdp.CircularOnlineFlow([BogusNode(),
-#                                 BogusOnlineNodeReturnSum(),
-#                                 BogusNode(),
-#                                 BogusOnlineNodeReturnSum()])
-#     flow_iters = 5
-#     flow1.set_flow_iterations(flow_iters)
-#     node1 = mdp.hinet.CircularOnlineFlowNode(flow1, numx_rng=mdp.numx_rand.RandomState(seed=1))
-#     flow2 = mdp.CircularOnlineFlow([BogusNode(),
-#                                 BogusOnlineNodeReturnSum(),
-#                                 BogusNode(),
-#                                 BogusOnlineNodeReturnSum()])
-#     node2 = mdp.hinet.OnlineFlowNode(flow2, numx_rng=mdp.numx_rand.RandomState(seed=1))
-#
-#     assert(node1.get_remaining_train_phase()==len(flow1)*flow_iters)
-#
-#     inp = numx.ones((1, 2))
-#     out1 = node1(inp) # One train (includes 3 iterations) and execute
-#     x = inp
-#     for _ in xrange(flow_iters):
-#         node2.train(x)
-#         x = node2.execute(x)
-#     assert_array_equal(out1, x)
-#     assert_array_equal(node1._stored_input, x)
-#
+def test_circular_online_flow_node():
+
+    # default setting (= onlineflownode)
+    flow1 = mdp.CircularOnlineFlow([BogusNode(),
+                                BogusOnlineNodeReturnSum(),
+                                BogusNode(),
+                                BogusOnlineNodeReturnSum()])
+
+    node1 = mdp.hinet.CircularOnlineFlowNode(flow1, numx_rng=mdp.numx_rand.RandomState(seed=1))
+    flow2 = mdp.CircularOnlineFlow([BogusNode(),
+                                BogusOnlineNodeReturnSum(),
+                                BogusNode(),
+                                BogusOnlineNodeReturnSum()])
+
+    node2 = mdp.hinet.OnlineFlowNode(flow2, numx_rng=mdp.numx_rand.RandomState(seed=1))
+
+    assert(node1.get_remaining_train_phase()==node2.get_remaining_train_phase())
+    assert(node1.get_stored_input() is None)
+    inp = numx.ones((1, 2))
+    out1 = node1(inp) # One train and execute
+    out2 = node2(inp) # One train and execute
+    assert_array_equal(out1, out2)
+    assert_array_equal(node1.get_stored_input(), out2)
+
+
+    # default setting with different output_node. Check stored_input
+    flow1 = mdp.CircularOnlineFlow([BogusNode(),
+                                BogusOnlineNodeReturnSum(),
+                                BogusNode(),
+                                BogusOnlineNodeReturnSum()])
+    flow1.set_output_node(2)
+    node1 = mdp.hinet.CircularOnlineFlowNode(flow1, numx_rng=mdp.numx_rand.RandomState(seed=1))
+    flow2 = mdp.CircularOnlineFlow([BogusNode(),
+                                BogusOnlineNodeReturnSum(),
+                                BogusNode(),
+                                BogusOnlineNodeReturnSum()])
+
+    node2 = mdp.hinet.OnlineFlowNode(flow2, numx_rng=mdp.numx_rand.RandomState(seed=1))
+
+    assert(node1.get_remaining_train_phase()==node2.get_remaining_train_phase())
+    assert(node1.get_stored_input() is None)
+    inp = numx.ones((1, 2))
+    out1 = node1(inp) # One train and execute
+    out2 = node2(inp) # One train and execute
+    assert_array_equal(node1.get_stored_input(), out2)
+    assert (not (out1 != out2).all())
+
+
+    # internal training (check errors without stored inputs)
+    flow1 = mdp.CircularOnlineFlow([BogusNode(),
+                                BogusOnlineNodeReturnSum(),
+                                BogusNode(),
+                                BogusOnlineNodeReturnSum()])
+    flow1.ignore_input(True)
+    node1 = mdp.hinet.CircularOnlineFlowNode(flow1, numx_rng=mdp.numx_rand.RandomState(seed=1))
+    flow2 = mdp.CircularOnlineFlow([BogusNode(),
+                                BogusOnlineNodeReturnSum(),
+                                BogusNode(),
+                                BogusOnlineNodeReturnSum()])
+    node2 = mdp.hinet.OnlineFlowNode(flow2, numx_rng=mdp.numx_rand.RandomState(seed=1))
+
+    assert(node1.get_remaining_train_phase()==node2.get_remaining_train_phase())
+    assert(node1.get_stored_input() is None)
+    inp = numx.ones((1, 2))
+    try:
+        node1.train(inp)
+        raise Exception("node trained internally without any stored inputs.")
+    except mdp.TrainingException: pass
+
+
+    # internal training with stored inputs. (check 1 loop output with default output)
+    flow1 = mdp.CircularOnlineFlow([BogusNode(),
+                                BogusOnlineNodeReturnSum(),
+                                BogusNode(),
+                                BogusOnlineNodeReturnSum()])
+    flow1.ignore_input(True)
+    node1 = mdp.hinet.CircularOnlineFlowNode(flow1, numx_rng=mdp.numx_rand.RandomState(seed=1))
+    flow2 = mdp.CircularOnlineFlow([BogusNode(),
+                                BogusOnlineNodeReturnSum(),
+                                BogusNode(),
+                                BogusOnlineNodeReturnSum()])
+    node2 = mdp.hinet.OnlineFlowNode(flow2, numx_rng=mdp.numx_rand.RandomState(seed=1))
+
+    inp = numx.ones((1, 2))
+    node1.set_stored_input(inp)
+    out1 = node1(inp) # One train and execute
+    out2 = node2(inp) # One train and execute
+    assert_array_equal(out1, out2)
+    assert_array_equal(node1._stored_input, out2)
+
+
+    # internal training with multiple iterations.
+    flow1 = mdp.CircularOnlineFlow([BogusNode(),
+                                BogusOnlineNodeReturnSum(),
+                                BogusNode(),
+                                BogusOnlineNodeReturnSum()])
+    flow1.ignore_input(True)
+    flow_iters = 5
+    flow1.set_flow_iterations(flow_iters)
+    node1 = mdp.hinet.CircularOnlineFlowNode(flow1, numx_rng=mdp.numx_rand.RandomState(seed=1))
+    flow2 = mdp.CircularOnlineFlow([BogusNode(),
+                                BogusOnlineNodeReturnSum(),
+                                BogusNode(),
+                                BogusOnlineNodeReturnSum()])
+    node2 = mdp.hinet.OnlineFlowNode(flow2, numx_rng=mdp.numx_rand.RandomState(seed=1))
+
+    # number of phases = flow_iters * (number of trainable nodes + 1 if the first node is not trainable)
+    assert(node1.get_remaining_train_phase()==3*flow_iters)
+
+    inp = numx.ones((1, 2))
+    node1.set_stored_input(inp)
+    out1 = node1(inp) # One train (includes 3 iterations) and execute
+
+    x = inp
+    for _ in xrange(flow_iters):
+        node2.train(x)
+        x = node2.execute(x)
+
+    assert_array_equal(out1, x)
+    assert_array_equal(node1.get_stored_input(), x)
+
+
+    #external training with iterations.
+    flow1 = mdp.CircularOnlineFlow([BogusNode(),
+                                BogusOnlineNodeReturnSum(),
+                                BogusNode(),
+                                BogusOnlineNodeReturnSum()])
+    flow_iters = 5
+    flow1.set_flow_iterations(flow_iters)
+    node1 = mdp.hinet.CircularOnlineFlowNode(flow1, numx_rng=mdp.numx_rand.RandomState(seed=1))
+    flow2 = mdp.CircularOnlineFlow([BogusNode(),
+                                BogusOnlineNodeReturnSum(),
+                                BogusNode(),
+                                BogusOnlineNodeReturnSum()])
+    node2 = mdp.hinet.OnlineFlowNode(flow2, numx_rng=mdp.numx_rand.RandomState(seed=1))
+
+    # number of phases = flow_iters * (number of trainable nodes + 1 if the first node is not trainable)
+    assert(node1.get_remaining_train_phase()==3*flow_iters)
+
+    inp = numx.ones((1, 2))
+    out1 = node1(inp) # One train (includes 3 iterations) and execute
+    x = inp
+    for _ in xrange(flow_iters):
+        node2.train(x)
+        x = node2.execute(x)
+    assert_array_equal(out1, x)
+    assert_array_equal(node1.get_stored_input(), x)
+

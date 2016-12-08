@@ -64,17 +64,6 @@ class OnlineFlowNode(FlowNode, mdp.OnlineNode):
         # one train_seq item for each node. Each node's train function
         # takes care of its multiple train phases (if any).
 
-        def get_train_function(_i_node, _node):
-            # This internal function is needed to channel the data through
-            # the nodes in front of the current nodes.
-            def _train(x, *args, **kwargs):
-                if _i_node > 0:
-                    _node.train(self._flow.execute(x, nodenr=_i_node-1),
-                                *args, **kwargs)
-                else:
-                    _node.train(x, *args, **kwargs)
-            return _train
-
         def get_execute_function(_i_node, _j_node):
             # This internal function is needed to channel the data through
             # the nodes i to j
@@ -87,6 +76,11 @@ class OnlineFlowNode(FlowNode, mdp.OnlineNode):
                 return x
             return _execute
 
+        def get_empty_function():
+            def _empty(x, *args, **kwargs):
+                pass
+            return _empty
+
         trainable_nodes_nrs = []    # list of trainable node ids
         trainable_nodes = []        # list of trainable nodes
         for i_node, node in enumerate(self._flow):
@@ -98,7 +92,7 @@ class OnlineFlowNode(FlowNode, mdp.OnlineNode):
         # if the first node is not trainable, channel the input data through
         # the nodes till the first trainable-node.
         if trainable_nodes_nrs[0] > 0:
-            train_seq += [(lambda x, *args, **kwargs: None, lambda x, *args, **kwargs: None,
+            train_seq += [(get_empty_function(), get_empty_function(),
                            get_execute_function(0, trainable_nodes_nrs[0]))]
 
         for i in xrange(len(trainable_nodes_nrs)):
@@ -110,7 +104,7 @@ class OnlineFlowNode(FlowNode, mdp.OnlineNode):
             else:
                 # skip the execution for the last trainable node.
                 train_seq += [(trainable_nodes[i].train, trainable_nodes[i].stop_training,
-                               lambda x, *args, **kwargs: None)]
+                               get_empty_function())]
 
         # try fix the dimension of the internal nodes and the FlowNode
         # after the stop training has been called.
@@ -155,9 +149,11 @@ class CircularOnlineFlowNode(FlowNode, mdp.OnlineNode):
         self._ignore_input = flow._ignore_input
         self._stored_input = flow._stored_input
 
-
     def set_stored_input(self, x):
         self._stored_input = x
+
+    def get_stored_input(self):
+        return self._stored_input
 
     def _check_compatibilitiy(self, flow):
         if not isinstance(flow, mdp.CircularOnlineFlow):
@@ -200,69 +196,95 @@ class CircularOnlineFlowNode(FlowNode, mdp.OnlineNode):
             'self._flow_iterations' loops with the updating stored input.
         """
 
-        def get_train_function(node, ignore_input):
-            def _train(x, *args, **kwargs):
-                if ignore_input:
-                    if self._stored_input is None:
-                        raise mdp.TrainingException("There are no stored inputs to train on. "
-                                                    "Set them using 'set_stored_input' method.")
-                    x = self._stored_input
-                node.train(x, *args, **kwargs)
-            return _train
-
-        def get_execute_function(node, ignore_input):
+        def get_execute_function(_i_node, _j_node):
+            # This internal function is needed to channel the data through
+            # the nodes i to j
             def _execute(x, *args, **kwargs):
-                if ignore_input:
-                    if self._stored_input is None:
-                        raise mdp.TrainingException("There are no stored inputs to execute. "
-                                                    "Set them using 'set_stored_input' method.")
-                    x = self._stored_input
-                return node.execute(x, *args, **kwargs)
+                for i in xrange(_i_node, _j_node):
+                    try:
+                        x = self._flow[i].execute(x)
+                    except Exception as e:
+                        self._flow._propagate_exception(e, i)
+                return x
             return _execute
 
-        def get_execute_wrapper(self, fun):
-            def _execute_wrapper(x, *args, **kwargs):
-                x = fun(x, *args, **kwargs)
+        def get_empty_function():
+            def _empty(x, *args, **kwargs):
+                pass
+            return _empty
+
+        def _get_ignore_input_train_wrapper(fn):
+            def _ignore_input_train_wrapper(x, *args, **kwargs):
+                if self._stored_input is None:
+                    raise mdp.TrainingException("No stored inputs to train on! Set using"
+                                                "'set_stored_input' method")
+                fn(self._stored_input, *args, **kwargs)
+            return _ignore_input_train_wrapper
+
+        def _get_ignore_input_execute_wrapper(fn):
+            def _ignore_input_execute_wrapper(x, *args, **kwargs):
+                return fn(self._stored_input, *args, **kwargs)
+            return _ignore_input_execute_wrapper
+
+        def _get_save_output_wrapper(fn):
+            def _save_output_wrapper(*args, **kwargs):
+                x = fn(*args, **kwargs)
                 self._stored_input = x.copy()
-                return x
-            return _execute_wrapper
+            return _save_output_wrapper
+
+        # get one iteration train sequence without stop training
+
+        trainable_nodes_nrs = []    # list of trainable node ids
+        trainable_nodes = []        # list of trainable nodes
+        for i_node, node in enumerate(self._flow):
+            if node.is_trainable():
+                trainable_nodes_nrs.append(i_node)
+                trainable_nodes.append(node)
 
         train_seq = []
-        for flow_iter in xrange(self._flow_iterations):
-            for i, node in enumerate(self._flow):
-                if i == 0:
-                    if node.is_trainable():
-                        if (flow_iter == 0):
-                            # The first node (trainable) for the first iteration trains on the stored input
-                            # if self._ignore_input is True, otherwise the given input.
-                            train_seq += [(get_train_function(node, self._ignore_input), node.stop_training,
-                                           get_execute_function(node, self._ignore_input))]
-                        else:
-                            # For the remaining iterations, the first node executes only the stored input.
-                            train_seq += [(get_train_function(node, True), node.stop_training,
-                                           get_execute_function(node, True))]
-                    else:
-                        if (flow_iter == 0):
-                            # The first node (non-trainable) for the first iteration executes on the stored input
-                            # if self._ignore_input is True, otherwise the given input.
-                            train_seq += [(lambda x, *args, **kwargs: None, lambda x, *args, **kwargs: None,
-                                           get_execute_function(node, self._ignore_input))]
-                        else:
-                            # For the remaining iterations, the first node executes only the stored input.
-                            train_seq += [(lambda x, *args, **kwargs: None, lambda x, *args, **kwargs: None,
-                                           get_execute_function(node, True))]
-                else:
-                    if node.is_trainable():
-                        # Rest of the trainable nodes train on the input from the execution phase of their previous nodes.
-                        train_seq += [(get_train_function(node, False), node.stop_training,
-                                       get_execute_function(node, False))]
-                    else:
-                        # Rest of the non-trainable nodes execute the input from the execution phase of their previous nodes.
-                        train_seq += [(lambda x, *args, **kwargs: None, lambda x, *args, **kwargs: None,
-                                       get_execute_function(node, False))]
+        # if the first node is not trainable, channel the input data through
+        # the nodes till the first trainable-node.
+        if trainable_nodes_nrs[0] > 0:
+            train_seq += [(get_empty_function(), get_empty_function(),
+                           get_execute_function(0, trainable_nodes_nrs[0]))]
 
-            # update the stored input after the execute method of the last node is called, at the end of each iteration.
-            train_seq[-1] = (train_seq[-1][0], train_seq[-1][1], get_execute_wrapper(self, train_seq[-1][2]))
+        for i in xrange(len(trainable_nodes_nrs)):
+            if i < (len(trainable_nodes_nrs) - 1):
+                # the execute function channels the data from the current node to the
+                # next trainable node
+                train_seq += [(trainable_nodes[i].train, get_empty_function(),
+                               get_execute_function(trainable_nodes_nrs[i], trainable_nodes_nrs[i + 1]))]
+            else:
+                # the execute function channels the data through the remaining nodes
+                # to generate input for the next iteration
+                train_seq += [(trainable_nodes[i].train, get_empty_function(),
+                               get_execute_function(trainable_nodes_nrs[i], len(self._flow)))]
+
+        # repeat for (self._flow_iterations-1) iterations
+        train_seq *= (self._flow_iterations-1)
+
+        # for the last iteration add stop_training calls and save output.
+        if trainable_nodes_nrs[0] > 0:
+            train_seq += [(get_empty_function(), get_empty_function(),
+                           get_execute_function(0, trainable_nodes_nrs[0]))]
+
+        for i in xrange(len(trainable_nodes_nrs)):
+            if i < (len(trainable_nodes_nrs) - 1):
+                # the execute function channels the data from the current node to the
+                # next trainable node
+                train_seq += [(trainable_nodes[i].train, trainable_nodes[i].stop_training,
+                               get_execute_function(trainable_nodes_nrs[i], trainable_nodes_nrs[i + 1]))]
+            else:
+                # the execute function channels the data through the remaining nodes
+                # to save the output for the next train call.
+                train_seq += [(trainable_nodes[i].train, trainable_nodes[i].stop_training,
+                               _get_save_output_wrapper(get_execute_function(trainable_nodes_nrs[i],
+                                                                             len(self._flow))))]
+
+        if self._ignore_input:
+            # finally, if ignore input is set, then add the ignore input wraaper to the first train_seq.
+            train_seq[0] = (_get_ignore_input_train_wrapper(train_seq[0][0]), train_seq[0][1],
+                            _get_ignore_input_execute_wrapper(train_seq[0][2]))
 
         return train_seq
 
