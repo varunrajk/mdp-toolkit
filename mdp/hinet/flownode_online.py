@@ -63,20 +63,68 @@ class OnlineFlowNode(FlowNode, mdp.OnlineNode):
         # Unlike thw FlowNode, the OnlineFlowNode requires only
         # one train_seq item for each node. Each node's train function
         # takes care of its multiple train phases (if any).
-        train_seq = []
-        last_tr_node_ptr = 0
-        for i, node in enumerate(self._flow):
+
+        def get_train_function(_i_node, _node):
+            # This internal function is needed to channel the data through
+            # the nodes in front of the current nodes.
+            def _train(x, *args, **kwargs):
+                if _i_node > 0:
+                    _node.train(self._flow.execute(x, nodenr=_i_node-1),
+                                *args, **kwargs)
+                else:
+                    _node.train(x, *args, **kwargs)
+            return _train
+
+        def get_execute_function(_i_node, _j_node):
+            # This internal function is needed to channel the data through
+            # the nodes i to j
+            def _execute(x, *args, **kwargs):
+                for i in xrange(_i_node, _j_node):
+                    try:
+                        x = self._flow[i].execute(x)
+                    except Exception as e:
+                        self._flow._propagate_exception(e, i)
+                return x
+            return _execute
+
+        trainable_nodes_nrs = []    # list of trainable node ids
+        trainable_nodes = []        # list of trainable nodes
+        for i_node, node in enumerate(self._flow):
             if node.is_trainable():
-                last_tr_node_ptr = i
-                train_seq +=[(node.train, node.stop_training, node.execute)]
+                trainable_nodes_nrs.append(i_node)
+                trainable_nodes.append(node)
+
+        train_seq = []
+        # if the first node is not trainable, channel the input data through
+        # the nodes till the first trainable-node.
+        if trainable_nodes_nrs[0] > 0:
+            train_seq += [(lambda x, *args, **kwargs: None, lambda x, *args, **kwargs: None,
+                           get_execute_function(0, trainable_nodes_nrs[0]))]
+
+        for i in xrange(len(trainable_nodes_nrs)):
+            if i < (len(trainable_nodes_nrs) - 1):
+                # the execute function channels the data from the current node to the
+                # next trainable node
+                train_seq += [(trainable_nodes[i].train, trainable_nodes[i].stop_training,
+                               get_execute_function(trainable_nodes_nrs[i], trainable_nodes_nrs[i + 1]))]
             else:
-                train_seq +=[(lambda x, *args, **kwargs: None, lambda x, *args, **kwargs: None, node.execute)]
+                # skip the execution for the last trainable node.
+                train_seq += [(trainable_nodes[i].train, trainable_nodes[i].stop_training,
+                               lambda x, *args, **kwargs: None)]
 
-        # skip the non-trainable terminal phases (if any)
-        train_seq = train_seq[:(last_tr_node_ptr+1)]
+        # try fix the dimension of the internal nodes and the FlowNode
+        # after the stop training has been called.
+        def _get_stop_training_wrapper(self, node, func):
+            def _stop_training_wrapper(*args, **kwargs):
+                func(*args, **kwargs)
+                self._fix_nodes_dimensions()
+            return _stop_training_wrapper
 
-        # And it is unnecessary to fix the dimensions like in the FlowNode, as the terminal
-        # execute phases takes care of it.
+        if train_seq:
+            train_seq[-1] = (train_seq[-1][0],
+                             _get_stop_training_wrapper(self, self._flow[-1], train_seq[-1][1]),
+                             train_seq[-1][2])
+
         return train_seq
 
 
@@ -182,7 +230,7 @@ class CircularOnlineFlowNode(FlowNode, mdp.OnlineNode):
         train_seq = []
         for flow_iter in xrange(self._flow_iterations):
             for i, node in enumerate(self._flow):
-                if (i==0):
+                if i == 0:
                     if node.is_trainable():
                         if (flow_iter == 0):
                             # The first node (trainable) for the first iteration trains on the stored input
