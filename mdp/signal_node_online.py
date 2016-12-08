@@ -1,9 +1,16 @@
-__docformat__ = "restructuredtext en"
 
 import mdp
 from mdp import NodeException, IsNotTrainableException
 from mdp import TrainingException, TrainingFinishedException, IsNotInvertibleException
 from mdp import Node
+
+__docformat__ = "restructuredtext en"
+
+
+class OnlineNodeException(NodeException):
+    """Base class for exceptions in `OnlineNode` subclasses."""
+    pass
+
 
 class OnlineNode(Node):
 
@@ -62,7 +69,7 @@ class OnlineNode(Node):
         If numx_rng is unspecified, it will be set to a random number generator
         with a random seed.
         """
-        super(OnlineNode, self).__init__(input_dim,output_dim,dtype)
+        super(OnlineNode, self).__init__(input_dim, output_dim, dtype)
         # this var stores the index of the current training iteration
         self._train_iteration = 0
         # this cache var dict stores an interemediate result or paramenter values
@@ -78,7 +85,7 @@ class OnlineNode(Node):
         # this variable can be set using set_training_type() method.
         self._training_type = 'incremental'
 
-    ### properties in addition to the Node properties
+    # properties in addition to the Node properties
 
     def get_numx_rng(self):
         """Return input dimensions."""
@@ -91,8 +98,8 @@ class OnlineNode(Node):
         if rng is None:
             pass
         elif not isinstance(rng, mdp.numx_rand.mtrand.RandomState):
-                raise NodeException('numx_rng should be of type %s but given %s'
-                                    %(str(mdp.numx_rand.mtrand.RandomState), str(type(rng))))
+                raise OnlineNodeException('numx_rng should be of type %s but given %s'
+                                    % (str(mdp.numx_rand.mtrand.RandomState), str(type(rng))))
         else:
             self._set_numx_rng(rng)
 
@@ -120,8 +127,8 @@ class OnlineNode(Node):
         if (training_type == 'incremental') or (training_type == 'batch'):
             self._training_type = training_type
         else:
-            raise NodeException("Unknown training type specified %s. Supported types ['incremental', 'batch']"%(training_type))
-
+            raise OnlineNodeException("Unknown training type specified %s. Supported types "
+                                "['incremental', 'batch']" % training_type)
 
     # Each element in the _train_seq contains three sub elements
     # (training-phase, stop-training-phase, execution-phase)
@@ -162,13 +169,13 @@ class OnlineNode(Node):
     def _get_train_seq(self):
         return [(self._train, self._stop_training, lambda x, *args, **kwargs: x)]
 
-    ### additional OnlineNode states
+    # additional OnlineNode states
 
     def get_current_train_iteration(self):
         """Return the index of the current training iteration."""
         return self._train_iteration
 
-    ### check functions
+    # check functions
 
     # The stop-training operation is removed to support continual training
     # and execution phases.
@@ -177,8 +184,7 @@ class OnlineNode(Node):
         It can be used when a subclass defines multiple execution methods.
         """
         # if training has not started yet, assume we want to train the node
-        if (self.get_current_train_phase() == 0 and
-            not self._train_phase_started):
+        if (self.get_current_train_phase() == 0) and not self._train_phase_started:
             self.train(x)
 
         # control the dimension x
@@ -220,7 +226,7 @@ class OnlineNode(Node):
         if self.numx_rng is None:
             self.numx_rng = mdp.numx_rand.RandomState()
 
-    ### Additional methods to be implemented by the user
+    # Additional methods to be implemented by the user
 
     # these are the methods the user has to overwrite
     # they receive the data already casted to the correct type
@@ -229,7 +235,7 @@ class OnlineNode(Node):
         # overwrite to check if the learning parameters of the node are properly defined.
         pass
 
-    ### User interface to the overwritten methods
+    # User interface to the overwritten methods
 
     def train(self, x, *args, **kwargs):
         """Update the internal structures according to the input data `x`.
@@ -262,19 +268,19 @@ class OnlineNode(Node):
         self._train_phase_started = True
 
         if self.training_type == 'incremental':
-            x = x[:,None,:] # to train sample by sample with 2D shape
+            x = x[:, None, :]  # to train sample by sample with 2D shape
             for _x in x:
                 for _phase in xrange(len(self._train_seq)):
                     self._train_seq[_phase][0](_x, *args, **kwargs)
                     # legacy support for _train_seq.
-                    if (len(self._train_seq[_phase]) > 2):
+                    if len(self._train_seq[_phase]) > 2:
                         _x = self._train_seq[_phase][2](_x, *args, **kwargs)
                 self._train_iteration += 1
         else:
             for _phase in xrange(len(self._train_seq)):
                 self._train_seq[_phase][0](x, *args, **kwargs)
                 # legacy support for _train_seq.
-                if (len(self._train_seq[_phase]) > 2):
+                if len(self._train_seq[_phase]) > 2:
                     x = self._train_seq[_phase][2](x, *args, **kwargs)
             self._train_iteration += x.shape[0]
 
@@ -285,7 +291,7 @@ class OnlineNode(Node):
         this functionality. The docstring of the `_stop_training` method
         overwrites this docstring.
         """
-        if self.is_training() and self._train_phase_started == False:
+        if self.is_training() and self._train_phase_started is False:
             raise TrainingException("The node has not been trained.")
 
         if not self.is_training():
@@ -317,10 +323,10 @@ class OnlineNode(Node):
             return flow_copy.copy()
         else:
             err_str = ('can only concatenate node'
-                       ' (not \'%s\') to node' % (type(other).__name__))
+                       ' (not \'%s\') to node' % type(other).__name__)
             raise TypeError(err_str)
 
-    ###### string representation
+    # string representation
 
     def __repr__(self):
         # print input_dim, output_dim, dtype and numx_rng
@@ -331,7 +337,7 @@ class OnlineNode(Node):
             typ = 'dtype=None'
         else:
             typ = "dtype='%s'" % self.dtype.name
-        numx_rng = "numx_rng=%s"% str(self.numx_rng)
+        numx_rng = "numx_rng=%s" % str(self.numx_rng)
         args = ', '.join((inp, out, typ, numx_rng))
         return name + '(' + args + ')'
 
@@ -358,3 +364,122 @@ class PreserveDimOnlineNode(OnlineNode):
         self._input_dim = n
         self._output_dim = n
 
+
+class RLNodeException(NodeException):
+    """Base class for exceptions in `OnlineNode` subclasses."""
+    pass
+
+
+class RLNode(OnlineNode):
+    """An RLNode is the basic building block of
+        a reinforcement learning (RL) application. It inherits
+        all OnlineNode features and capabilities.
+
+        Most RL algorithms require sequence of tuples
+        (Current observation, future observation, action, reward, episode_done flag)
+        as an input to update either a policy or a value function.
+
+        Therefore, the input data 'x' to an RLNode is a concatenated 2D array
+        of these tuples.
+
+        `RLNode` subclasses should take care of overwriting (if necessary)
+        the functions `_train`, `_stop_training`, `_execute` and `_get_supported_dtypes`.
+
+        The '_train' and '_execute' methods receive a parsed input as multiple arguments:
+        (observation array, future observation array, action array, reward array, episode_done array)
+
+        Here is an example to show how the data can be accessed while overwriting the _train method:
+
+        def _train(*args, **kwargs):
+            # phi - current observation 2D array
+            # phi_ - future observation 2D array
+            # a - action 2D array
+            # r - reward 2D array
+            # done - episode done flog 2D array
+            # order consistent with the output data of the OpenAI's GymNode.
+            phi, phi_, a, r, done = args[:5]
+
+            (rest of the code follows here)
+
+    """
+
+    def __init__(self, observation_dim, action_dim, reward_dim=1, dtype=None, numx_rng=None):
+        """
+        observation_dim - observation dimension
+        action_dim - action dimension
+        reward_dim - reward dimension (defualt 1 - scalar rewards)
+        """
+        super(RLNode, self).__init__(input_dim=None, output_dim=None, dtype=dtype, numx_rng=numx_rng)
+
+        self._observation_dim = observation_dim
+        self._action_dim = action_dim
+        self._reward_dim = reward_dim
+
+    # properties in addition to the Node properties
+    @property
+    def observation_dim(self):
+        """Return state dimensions."""
+        return self._observation_dim
+
+    @property
+    def action_dim(self):
+        """Return action dimensions."""
+        return self._action_dim
+
+    @property
+    def reward_dim(self):
+        """Return reward dimensions."""
+        return self._reward_dim
+
+    @staticmethod
+    def is_invertible():
+        return False
+
+    def _split_data_dims(self, x):
+        # split the data dims
+        _d = (self.observation_dim*2 + self.action_dim + self.reward_dim)
+        if x.shape[1] < _d:
+            raise mdp.TrainingException("input x requires minimum %d dims, given %d." % (_d, x.shape[1]))
+
+        dims = [self.observation_dim, self.observation_dim, self.action_dim, self.reward_dim, x.shape[1]-_d]
+        out = []
+        start_indx = 0
+        for i in xrange(len(dims)):
+            out.append(x[:, start_indx:start_indx+dims[i]])
+            start_indx += dims[i]
+        return out
+
+    def _get_train_seq(self):
+        def get_train_function():
+            def _train(x, *args, **kwargs):
+                inp = self._split_data_dims(x) + list(args)
+                self._train(*inp, **kwargs)
+            return _train
+        return [(get_train_function(), self.stop_training, lambda x, *args, **kwargs: x)]
+
+    # Methods to be implemented or overwritten by the user
+
+    def _train(self, *args, **kwargs):
+        if self.is_trainable():
+            raise NotImplementedError
+
+    def _execute(self, *args, **kwargs):
+        return args[0]
+
+    # User interface to the overwritten methods
+
+    def execute(self, x, *args, **kwargs):
+        """Process the data contained in `x`.
+
+        If the object is still in the training phase, the function
+        `stop_training` will be called.
+        `x` is a matrix having different variables on different columns
+        and observations on the rows.
+
+        By default, subclasses should overwrite `_execute` to implement
+        their execution phase. The docstring of the `_execute` method
+        overwrites this docstring.
+        """
+        self._pre_execution_checks(x)
+        inp = self._split_data_dims(self._refcast(x)) + list(args)
+        return self._execute(*inp, **kwargs)

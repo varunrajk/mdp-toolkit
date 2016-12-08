@@ -143,12 +143,14 @@ from .linear_flows import CrashRecoveryException, FlowException, FlowExceptionCR
 from .signal_node import (NodeMetaclass, Node, PreserveDimNode,
                          Cumulator, VariadicCumulator)
 
-from .signal_node_online import OnlineNode, PreserveDimOnlineNode
+from .signal_node_online import (OnlineNode, PreserveDimOnlineNode, RLNode,
+                                 OnlineNodeException, RLNodeException)
 
 from .linear_flows import (Flow, CheckpointFlow,
                           CheckpointFunction, CheckpointSaveFunction)
 
-from .linear_flows_online import OnlineFlow, CircularOnlineFlow
+from .linear_flows_online import (OnlineFlow, CircularOnlineFlow, OnlineFlowException,
+                                  CircularOnlineFlowException)
 
 # import helper functions:
 from .helper_funcs import pca, fastica
@@ -189,6 +191,8 @@ __all__ = ['config',
            'FlowExceptionCR',
            'OnlineFlow',
            'CircularOnlineFlow',
+           'OnlineFlowException',
+           'CircularOnlineFlowException',
            'IsNotInvertibleException',
            'IsNotTrainableException',
            'MDPException',
@@ -196,6 +200,9 @@ __all__ = ['config',
            'Node',
            'NodeException',
            'OnlineNode',
+           'RLNode',
+           'OnlineNodeException',
+           'RLNodeException',
            'TrainingException',
            'TrainingFinishedException',
            'VariadicCumulator',
