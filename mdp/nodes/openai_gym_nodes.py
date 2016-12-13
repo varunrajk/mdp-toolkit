@@ -103,7 +103,7 @@ class GymNode(mdp.OnlineNode):
         self._output_dim = self.observation_dim*2 + self.action_dim + 1 + 1
 
         # get observation
-        self._phi = self.env.reset().reshape(1, self.observation_dim)
+        self._phi = mdp.numx.reshape(self.env.reset(), [1, self.observation_dim])
 
         # cache to store variables
         self._cache = {'info': None}
@@ -169,7 +169,7 @@ class GymNode(mdp.OnlineNode):
         self.env.render(close=True)
 
     def get_random_actions(self, n=1):
-        return mdp.numx.asarray([self.env.action_space.sample() for _ in xrange(n)]).reshape(n, self.input_dim)
+        return mdp.numx.reshape([self.env.action_space.sample() for _ in xrange(n)], (n, self.input_dim))
 
     def get_environment_samples(self, n=1):
         # Generates random environment samples
