@@ -403,13 +403,14 @@ class RLNode(OnlineNode):
 
     """
 
-    def __init__(self, observation_dim, action_dim, reward_dim=1, dtype=None, numx_rng=None):
+    def __init__(self, observation_dim, action_dim, reward_dim=1, input_dim=None, output_dim=None,
+                 dtype=None, numx_rng=None):
         """
         observation_dim - observation dimension
         action_dim - action dimension
         reward_dim - reward dimension (defualt 1 - scalar rewards)
         """
-        super(RLNode, self).__init__(input_dim=None, output_dim=None, dtype=dtype, numx_rng=numx_rng)
+        super(RLNode, self).__init__(input_dim=input_dim, output_dim=output_dim, dtype=dtype, numx_rng=numx_rng)
 
         self._observation_dim = observation_dim
         self._action_dim = action_dim
