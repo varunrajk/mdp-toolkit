@@ -13,7 +13,8 @@ from .em_nodes import FANode
 from .misc_nodes import (IdentityNode, HitParadeNode, TimeFramesNode,
                         TimeDelayNode, TimeDelaySlidingWindowNode,
                         EtaComputerNode, NoiseNode, NormalNoiseNode,
-                        CutoffNode, HistogramNode, AdaptiveCutoffNode, NumxBufferNode)
+                        CutoffNode, HistogramNode, AdaptiveCutoffNode, NumxBufferNode,
+                         TransformerNode)
 from .isfa_nodes import ISFANode
 from .rbm_nodes import RBMNode, RBMWithLabelsNode
 from .regression_nodes import LinearRegressionNode
@@ -42,6 +43,8 @@ from .explorer_nodes import (DiscreteExplorerNode, ContinuousExplorerNode, Epsil
 from .grid_processing_nodes import GridProcessingNode
 from .basis_function_nodes import BasisFunctionNode
 
+from .q_rl_nodes import (QRLNode, QLambdaRLNode)
+
 __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
            'CuBICANode', 'TDSEPNode', 'JADENode', 'SFANode', 'SFA2Node',
            'ISFANode', 'XSFANode', 'FDANode', 'FANode', 'RBMNode',
@@ -61,7 +64,8 @@ __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
            'IncSFANode', 'HSFANode', 'HSFAPoolNode', 'NumxBufferNode',
            'DiscreteExplorerNode', 'ContinuousExplorerNode', 'EpsilonGreedyDiscreteExplorerNode',
            'EpsilonGreedyContinuousExplorerNode', 'BoltzmannDiscreteExplorerNode', 'GaussianContinuousExplorereNode',
-           'BasisFunctionNode', 'GridProcessingNode'
+           'BasisFunctionNode', 'GridProcessingNode', 'TransformerNode',
+           'QRLNode', 'QLambdaRLNode'
            ]
 
 
@@ -133,5 +137,6 @@ utils.fixup_namespace(__name__, __all__ + ['ICANode'],
                        'explorer_nodes',
                        'openai_gym_nodes',
                        'basis_function_nodes',
-                       'grid_processing_nodes'
+                       'grid_processing_nodes',
+                       'q_rl_nodes'
                         ))
