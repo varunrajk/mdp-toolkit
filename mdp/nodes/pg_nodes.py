@@ -90,6 +90,21 @@ class PG2DNode(mdp.PreserveDimNode):
     y_range = property(get_y_range, set_y_range, doc="y-axis range")
 
     @staticmethod
+    def _get_pglut(lutname=None):
+        pg_lut = None
+        if lutname is not None:
+            from matplotlib.cm import get_cmap
+            from matplotlib.colors import ColorConverter
+            lut = []
+            cmap = get_cmap(lutname, 1000)
+            for i in range(1000):
+                r, g, b = ColorConverter().to_rgb(cmap(i))
+                lut.append([r * 255, g * 255, b * 255])
+            pg_lut = mdp.numx.array(lut, dtype=mdp.numx.uint8)
+            pg_lut[0, :] = [0, 0, 0]
+        return pg_lut
+
+    @staticmethod
     def is_trainable():
         return False
 
@@ -163,15 +178,11 @@ class PG2DNode(mdp.PreserveDimNode):
         self._flow_time = time.time()
         return x
 
-    def close(self):
-        # Force close all the plots.
-        # This is usually not required as the process terminates if the
-        # windows are manually closed.
-        if not self.new_data.empty():
-            self.new_data.get()
-        self.new_data.put(None)
-        self._viewer.join()
-        return
+    def stop_rendering(self):
+        # close all the plots.
+        if self._viewer is not None:
+            self.__plot(None)
+            self._viewer.join()
 
 
 class PGCurveNode(PG2DNode):
@@ -309,21 +320,6 @@ class PGImageNode(PG2DNode):
 
         # Force unset use_buffer
         self.use_buffer = False
-
-    @staticmethod
-    def _get_pglut(lutname=None):
-        pg_lut = None
-        if lutname is not None:
-            from matplotlib.cm import get_cmap
-            from matplotlib.colors import ColorConverter
-            lut = []
-            cmap = get_cmap(lutname, 1000)
-            for i in range(1000):
-                r, g, b = ColorConverter().to_rgb(cmap(i))
-                lut.append([r * 255, g * 255, b * 255])
-            pg_lut = mdp.numx.array(lut, dtype=mdp.numx.uint8)
-            pg_lut[0, :] = [0, 0, 0]
-        return pg_lut
 
     def _setup_plots(self):
         self._win = pg.GraphicsWindow()
