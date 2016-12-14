@@ -92,10 +92,11 @@ class HSFANode(mdp.Node):
         def get_output_dims_from_flownode(flownode):
             outdims = []
             for node in flownode.flow:
-                if node.input_dim == node.output_dim:
-                    outdims.append(-1)
-                else:
-                    outdims.append(node.output_dim)
+                if node.is_trainable():
+                    if node.input_dim == node.output_dim:
+                        outdims.append(-1)
+                    else:
+                        outdims.append(node.output_dim)
             return tuple(outdims)
         sb, cln = self._execution_flow[0].flow[:2]
         self.in_channel_xy = sb.in_channels_xy
@@ -114,6 +115,8 @@ class HSFANode(mdp.Node):
         if self.n_training_fields is not None:
             self.n_training_fields = n_training_fields
             self.field_dstr = self._training_flow[0].flow[0].field_dstr
+        self._output_shape = (sb.out_channels_xy[0], sb.out_channels_xy[1], cln.node.output_dim)
+        self._rec_n_training_fields = self._rec_n_training_fields[:self.n_layers]
 
     def _check_n_training_fields(self):
         for i in xrange(len(self._rec_n_training_fields)):
@@ -348,10 +351,28 @@ class HSFANode(mdp.Node):
     def __iter__(self):
         return self._execution_flow.__iter__()
 
-
     def __contains__(self, item):
         return self._execution_flow.__contains__(item)
 
+    def __delitem__(self, key):
+        keys = range(len(self._execution_flow))[key]
+        if mdp.numx.isscalar(keys):
+            keys = [keys]
+        if keys[-1] != len(self._execution_flow) - 1:
+            raise mdp.NodeException("Can only delete terminal layers and not intermediate layers-%s." % str(keys))
+
+        # if no exeception was raised, accept the key
+        # make a copy of list first
+        execution_flow_copy = list(self._execution_flow)
+        del execution_flow_copy[key]
+
+        # check dimension consistency
+        self._execution_flow._check_nodes_consistency(execution_flow_copy)
+        # if no exception was raised, accept the new sequence
+        self._execution_flow = mdp.Flow(execution_flow_copy)
+        if self.n_training_fields is not None:
+            self._training_flow = self._init_random_sampling_net()
+        self._set_args_from_net()
 
     ###### public container methods
 
