@@ -339,11 +339,13 @@ class HSFANode(mdp.Node):
 
     def __setitem__(self, key, value):
         execution_flow_copy = list(self._execution_flow)
+        if isinstance(value, mdp.Flow):
+            value = list(value)
         execution_flow_copy[key] = value
         # check dimension consistency
         self._execution_flow._check_nodes_consistency(execution_flow_copy)
         # if no exception was raised, accept the new sequence
-        self._execution_flow = execution_flow_copy
+        self._execution_flow = mdp.Flow(execution_flow_copy)
         if self.n_training_fields is not None:
             self._training_flow = self._init_random_sampling_net()
         self._set_args_from_net()
