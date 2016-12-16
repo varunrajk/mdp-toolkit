@@ -44,6 +44,7 @@ from .grid_processing_nodes import GridProcessingNode
 from .basis_function_nodes import BasisFunctionNode
 
 from .q_rl_nodes import (QRLNode, QLambdaRLNode)
+from .actor_critic_rl_nodes import (CaclaRLNode)
 
 __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
            'CuBICANode', 'TDSEPNode', 'JADENode', 'SFANode', 'SFA2Node',
@@ -65,7 +66,7 @@ __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
            'DiscreteExplorerNode', 'ContinuousExplorerNode', 'EpsilonGreedyDiscreteExplorerNode',
            'EpsilonGreedyContinuousExplorerNode', 'BoltzmannDiscreteExplorerNode', 'GaussianContinuousExplorereNode',
            'BasisFunctionNode', 'GridProcessingNode', 'TransformerNode',
-           'QRLNode', 'QLambdaRLNode'
+           'QRLNode', 'QLambdaRLNode', 'CaclaRLNode'
            ]
 
 
@@ -138,5 +139,6 @@ utils.fixup_namespace(__name__, __all__ + ['ICANode'],
                        'openai_gym_nodes',
                        'basis_function_nodes',
                        'grid_processing_nodes',
-                       'q_rl_nodes'
+                       'q_rl_nodes',
+                       'actor_critic_rl_nodes'
                         ))
