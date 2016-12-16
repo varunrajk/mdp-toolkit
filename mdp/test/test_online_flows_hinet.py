@@ -354,9 +354,6 @@ def test_online_flow_node():
     # number of training phases = number of trainable nodes + 1(if the first node is not-trainable).
     assert(node1.get_remaining_train_phase()==3)
 
-    for seq in node1._train_seq:
-        print [fn.__name__ for fn in seq]
-
     inp = numx.ones((2,2))
     out1 = node1(inp)
     out2 = node2(inp)
