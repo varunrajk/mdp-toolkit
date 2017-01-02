@@ -342,7 +342,7 @@ class OnlineNode(Node):
         return name + '(' + args + ')'
 
 
-class PreserveDimOnlineNode(OnlineNode):
+class PreserveDimOnlineNode(OnlineNode, mdp.PreserveDimNode):
     """Abstract base class with ``output_dim == input_dim``.
 
     If one dimension is set then the other is set to the same value.
@@ -438,11 +438,14 @@ class RLNode(OnlineNode):
 
     def _split_data_dims(self, x):
         # split the data dims
-        _d = (self.observation_dim*2 + self.action_dim + self.reward_dim)
+        _d = (self.observation_dim*2 + self.action_dim + self.reward_dim + 1)
         if x.shape[1] < _d:
             raise mdp.TrainingException("input x requires minimum %d dims, given %d." % (_d, x.shape[1]))
+        elif x.shape[1] == _d:
+            dims = [self.observation_dim, self.observation_dim, self.action_dim, self.reward_dim, 1]
+        else:
+            dims = [self.observation_dim, self.observation_dim, self.action_dim, self.reward_dim, 1, x.shape[1]-_d]
 
-        dims = [self.observation_dim, self.observation_dim, self.action_dim, self.reward_dim, x.shape[1]-_d]
         out = []
         start_indx = 0
         for i in xrange(len(dims)):
@@ -456,7 +459,7 @@ class RLNode(OnlineNode):
                 inp = self._split_data_dims(x) + list(args)
                 self._train(*inp, **kwargs)
             return _train
-        return [(get_train_function(), self.stop_training, lambda x, *args, **kwargs: x)]
+        return [(get_train_function(), self._stop_training, lambda x, *args, **kwargs: x)]
 
     # Methods to be implemented or overwritten by the user
 

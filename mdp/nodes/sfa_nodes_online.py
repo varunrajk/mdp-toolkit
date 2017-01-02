@@ -1,10 +1,8 @@
-import warnings as _warn
-
 import mdp
 from .mca_nodes_online import MCANode
 from .pca_nodes_online import CCIPCAWhiteningNode as WhiteningNode
 from .stats_nodes_online import MovingAvgNode, MovingTimeDiffNode
-from mdp.utils import mult
+from mdp.utils import mult, pinv
 
 
 class IncSFANode(mdp.OnlineNode):
@@ -29,8 +27,9 @@ class IncSFANode(mdp.OnlineNode):
          Difference in slow features after update
 
     """
+
     def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None, eps=0.05,
-                 whitening_output_dim=None, remove_mean=True, avg_n=None, amn_params=(20,200,2000,3),
+                 whitening_output_dim=None, remove_mean=True, avg_n=None, amn_params=(20, 200, 2000, 3),
                  init_pca_vectors=None, init_mca_vectors=None):
         """
         eps: Learning rate (default: 0.1)
@@ -45,8 +44,8 @@ class IncSFANode(mdp.OnlineNode):
 
         amn_params: pca amnesic parameters. Default set to (n1=20,n2=200,m=2000,c=3).
                             For n < n1, ~ moving average.
-                            For n1 < n < n2 - Transitions from moving average to amnesia. m denotes the scaling param and
-                            c typically should be between (2-4). Higher values will weigh recent data.
+                            For n1 < n < n2 - Transitions from moving average to amnesia. m denotes the scaling
+                            param and c typically should be between (2-4). Higher values will weigh recent data.
 
         init_pca_vectors: initial whitening vectors. Default - randomly set
 
@@ -54,30 +53,53 @@ class IncSFANode(mdp.OnlineNode):
 
         """
 
-        super(IncSFANode, self).__init__(input_dim, output_dim, dtype, numx_rng)
-        self.eps = eps
-        self.whitening_output_dim = whitening_output_dim
-
-        self.whiteningnode = WhiteningNode(input_dim=input_dim, output_dim=self.whitening_output_dim,
+        self.whiteningnode = WhiteningNode(input_dim=input_dim, output_dim=whitening_output_dim,
                                            dtype=dtype, numx_rng=numx_rng, init_eigen_vectors=init_pca_vectors,
                                            amn_params=amn_params)
-        self.tdiffnode = MovingTimeDiffNode(numx_rng=numx_rng)
-        self.mcanode = MCANode(input_dim=self.whitening_output_dim, output_dim=output_dim,
+        self.tdiffnode = MovingTimeDiffNode(numx_rng=numx_rng, dtype=dtype)
+        self.mcanode = MCANode(input_dim=whitening_output_dim, output_dim=output_dim,
                                dtype=dtype, numx_rng=numx_rng, init_eigen_vectors=init_mca_vectors, eps=eps)
+        if remove_mean:
+            self.avgnode = MovingAvgNode(numx_rng=numx_rng, avg_n=avg_n, dtype=dtype)
 
+        self.eps = eps
+        self.whitening_output_dim = whitening_output_dim
         self.remove_mean = remove_mean
         self.avg_n = avg_n
-        if remove_mean:
-            self.avgnode = MovingAvgNode(numx_rng=numx_rng, avg_n=avg_n)
+
+        super(IncSFANode, self).__init__(input_dim, output_dim, dtype, numx_rng)
 
         self._new_episode = None
-
         self._init_sf = None
         self.wv = None
         self.sf = None
 
         # cache to store variables
         self._cache = {'slow_features': None, 'whitening_vectors': None, 'weight_change': None}
+
+    def _set_input_dim(self, n):
+        self._input_dim = n
+        self.whiteningnode.input_dim = n
+
+    def _set_output_dim(self, n):
+        self._output_dim = n
+        self.mcanode.output_dim = n
+
+    def _set_dtype(self, t):
+        self._dtype = t
+        self.whiteningnode.dtype = t
+        self.tdiffnode.dtype = t
+        self.mcanode.dtype = t
+        if self.remove_mean:
+            self.avgnode.dtype = t
+
+    def _set_numx_rng(self, rng):
+        self._numx_rng = rng
+        self.whiteningnode.numx_rng = rng
+        self.tdiffnode.numx_rng = rng
+        self.mcanode.numx_rng = rng
+        if self.remove_mean:
+            self.avgnode.numx_rng = rng
 
     @property
     def init_slow_features(self):
@@ -100,27 +122,32 @@ class IncSFANode(mdp.OnlineNode):
             x = self.whiteningnode.execute(x)
             self._pseudo_check_fn(self.tdiffnode, x)
             self._pseudo_check_fn(self.mcanode, x)
-            self._init_sf = mult(self.whiteningnode.init_eigen_vectors,self.mcanode.init_eigen_vectors)
+            self._init_sf = mult(self.whiteningnode.init_eigen_vectors, self.mcanode.init_eigen_vectors)
             self.sf = self._init_sf
+            if self.output_dim is None:
+                self.output_dim = self.mcanode.output_dim
 
-        if self._new_episode is None:         # Set new_episode to True for the very first sample
+        if self._new_episode is None:  # Set new_episode to True for the very first sample
             self._new_episode = True
-        elif self._new_episode:               # Set new_episode to False for the subsequent samples
+        elif self._new_episode:  # Set new_episode to False for the subsequent samples
             self._new_episode = False
 
-    def _pseudo_check_fn(self, node, x):
+    @staticmethod
+    def _pseudo_check_fn(node, x):
         node._check_input(x)
         node._check_params(x)
 
-    def _pseudo_train_fn(self, node, x):
+    @staticmethod
+    def _pseudo_train_fn(node, x):
         node._train(x)
-        node._train_iteration+=x.shape[0]
+        node._train_iteration += x.shape[0]
 
     def _check_train_args(self, x, *args, **kwargs):
         if self.training_type is 'batch':
             # check that we have at least 2 time samples for batch training
-            if  x.shape[0] < 2:
-                raise mdp.TrainingException("Need at least 2 time samples for 'batch' training type (%d given)"%(x.shape[0]))
+            if x.shape[0] < 2:
+                raise mdp.TrainingException(
+                    "Need at least 2 time samples for 'batch' training type (%d given)" % (x.shape[0]))
 
     def _step_train(self, x):
         if self.remove_mean:
@@ -139,16 +166,17 @@ class IncSFANode(mdp.OnlineNode):
 
         self._pseudo_train_fn(self.mcanode, x)
 
-        sf = mult(self.whiteningnode.v,self.mcanode.v)
+        sf = mult(self.whiteningnode.v, self.mcanode.v)
         sf_change = mdp.numx_linalg.norm(sf - self.sf)
         self.sf = sf
         return sf_change
 
     def _train(self, x, new_episode=None):
+        sf_change = 0.0
         if self.training_type == 'batch':
             self._new_episode = True
             for i in xrange(x.shape[0]):
-                sf_change = self._step_train(x[i:i+1])
+                sf_change = self._step_train(x[i:i + 1])
                 self._new_episode = False
         else:
             if new_episode is not None:
@@ -164,6 +192,9 @@ class IncSFANode(mdp.OnlineNode):
             x = self.avgnode._execute(x)
         return mult(x, self.sf)
 
+    def _inverse(self, y):
+        return mult(y, pinv(self.sf)) + self.avgnode.avg
+
     def __repr__(self):
         # print all args
         name = type(self).__name__
@@ -174,13 +205,13 @@ class IncSFANode(mdp.OnlineNode):
         else:
             typ = "dtype='%s'" % self.dtype.name
         numx_rng = "numx_rng=%s" % str(self.numx_rng)
-        eps = "\neps=%s"% str(self.eps)
-        whit_dim = "whitening_output_dim=%s"%str(self.whitening_output_dim)
-        remove_mean = "remove_mean=%s"%str(self.remove_mean)
-        avg_n = "avg_n=%s"%(self.avg_n)
+        eps = "\neps=%s" % str(self.eps)
+        whit_dim = "whitening_output_dim=%s" % str(self.whitening_output_dim)
+        remove_mean = "remove_mean=%s" % str(self.remove_mean)
+        avg_n = "avg_n=%s" % self.avg_n
         amn = "\namn_params=%s" % str(self.whiteningnode.amn_params)
         init_pca_vecs = "init_pca_vectors=%s" % str(self.init_pca_vectors)
         init_mca_vecs = "init_pca_vectors=%s" % str(self.init_mca_vectors)
-        args = ', '.join((inp, out, typ, numx_rng, eps, whit_dim, remove_mean, avg_n, amn, init_pca_vecs, init_mca_vecs))
+        args = ', '.join(
+            (inp, out, typ, numx_rng, eps, whit_dim, remove_mean, avg_n, amn, init_pca_vecs, init_mca_vecs))
         return name + '(' + args + ')'
-

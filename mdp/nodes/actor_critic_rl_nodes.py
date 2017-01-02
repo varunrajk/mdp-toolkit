@@ -10,7 +10,7 @@ class CaclaRLNode(mdp.RLNode):
     """
 
     def __init__(self, observation_dim, action_dim, alpha=0.1, beta=0.1, gamma=0.99, output_mode='action',
-                 input_dim=None, output_dim=None, dtype=None, numx_rng=None):
+                 input_dim=None, dtype=None, numx_rng=None):
         """
         Additional arguments:
 
@@ -26,7 +26,7 @@ class CaclaRLNode(mdp.RLNode):
         """
 
         super(CaclaRLNode, self).__init__(observation_dim=observation_dim, action_dim=action_dim, reward_dim=1,
-                                          input_dim=input_dim, output_dim=output_dim, dtype=dtype,
+                                          input_dim=input_dim, output_dim=None, dtype=dtype,
                                           numx_rng=numx_rng)
         self._alpha = alpha
         self._beta = beta
@@ -49,10 +49,10 @@ class CaclaRLNode(mdp.RLNode):
 
     def _check_params(self, x):
         if self._theta is None:
-            self._theta = 0.1 * self.numx_rng.randn(self.observation_dim, 1)
+            self._theta = 0.1 * self.numx_rng.randn(self.observation_dim, 1).astype(self.dtype)
 
         if self._psi is None:
-            self._psi = 0.1 * self.numx_rng.randn(self.observation_dim, self.action_dim)
+            self._psi = 0.1 * self.numx_rng.randn(self.observation_dim, self.action_dim).astype(self.dtype)
 
     def get_value(self, phi):
         """Returns state value(s)."""

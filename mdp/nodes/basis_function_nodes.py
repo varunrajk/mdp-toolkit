@@ -24,7 +24,7 @@ class BasisFunctionNode(mdp.Node):
     """
 
     def __init__(self, basis_name, lims, order=3, decoupled=False, basis_params=None, scale_out=1.0, n_grid_pts=None,
-                 input_dim=None, output_dim=None, dtype=None):
+                 input_dim=None, dtype=None):
         """
         basis_name - name of the basis function to use: Supported: 'indicator', 'fourier', 'polynomial', 'radial',
                                 'lem' (laplacian eigen maps), 'gsfa' (graph-based slow features).
@@ -46,16 +46,19 @@ class BasisFunctionNode(mdp.Node):
                      Eg. [n1, n2, ...,]
 
         """
-        super(BasisFunctionNode, self).__init__(input_dim, output_dim, dtype)
+        super(BasisFunctionNode, self).__init__(input_dim, output_dim=None, dtype=dtype)
         self.basis_name = basis_name
 
         if len(lims) != 2:
-            raise mdp.NodeException("'lims' has %d elements given, required "
-                                    "2 [(min1, min2, ...,), (max1, max2, ...,)]" % (len(lims)))
+            raise mdp.NodeException("'lims' has %d elements given, required 2 "
+                                    "[(lower1, lower2, ...,), (upper1, upper2, ...,)]" % (len(lims)))
+        if mdp.numx.isscalar(lims[0]):
+            lims = [tuple((lim,)) for lim in lims]
         if len(lims[0]) != len(lims[1]):
-            raise mdp.NodeException("Length of lower_bounds ('lims[0]=%d') does not match the "
-                                    "length of upper_bounds ('lims[1]=%d)." % (len(lims[0]), len(lims[1])))
+            raise mdp.NodeException("Length of lower_bounds ('lims[0]=%d') does not match the length "
+                                    "of the upper_bounds ('lims[1]=%d)." % (len(lims[0]), len(lims[1])))
         self.lims = mdp.numx.asarray(lims)
+
         self.order = order
         self.scale_out = scale_out
         self.decoupled = decoupled
@@ -69,12 +72,13 @@ class BasisFunctionNode(mdp.Node):
 
         self._basis_mode = 'continuous'
 
+
         # Basis Fns Init
 
         if self.basis_name is 'indicator':
             self._basis_mode = 'discrete'
             self._gp.output_type = 'graphindx'
-            self._output_dim = int(mdp.numx.prod(self._gp.n_grid_pts))
+            self._output_dim = mdp.numx.prod(self._gp.n_grid_pts)
 
         elif self.basis_name is 'fourier':
             iterprod = itertools.product(map(str, mdp.numx.arange(self.order + 1)), repeat=self._input_dim)
@@ -187,16 +191,15 @@ class BasisFunctionNode(mdp.Node):
                 x += 0.0001 * mdp.numx_rand.randn(*x.shape)
             self._output_dim = int(min(self.order, self.v[-1].shape[0]))
             self._gp.output_type = 'gridx'
-
         else:
-            # subclasses can add additional more functions.
+            # subclasses can add additional functions.
             pass
 
     # Basis Function Calls
 
     def _indicator(self, x):
         phi = mdp.numx.zeros([x.shape[0], self._output_dim])
-        phi[range(x.shape[0]), x[:, 0]] = 1
+        phi[range(x.shape[0]), x[:, 0].astype('int')] = 1
         return phi
 
     def _fourier(self, x):
@@ -211,7 +214,7 @@ class BasisFunctionNode(mdp.Node):
         return self._rbfnode(x)
 
     def _lem(self, x):
-        return self.v[x.ravel(), :]
+        return self.v[x.ravel().astype('int'), :]
 
     def _gsfa(self, x):
         for layernum in xrange(self._nlayers):
@@ -229,9 +232,6 @@ class BasisFunctionNode(mdp.Node):
     @staticmethod
     def is_invertible():
         return False
-
-    def _get_supported_dtypes(self):
-        return mdp.utils.get_dtypes('AllInteger') + mdp.utils.get_dtypes('Float')
 
     # internal utility methods
 
@@ -264,7 +264,7 @@ class BasisFunctionNode(mdp.Node):
         pass
 
     def _execute(self, x):
-        return self._fn(self._gp(x)) * self.scale_out
+        return self._refcast(self._fn(self._gp(x)) * self.scale_out)
 
     @staticmethod
     def _matplotlib_fig_arr(fig):

@@ -1,5 +1,5 @@
-
 import mdp
+
 
 class DiscreteExplorerNode(mdp.OnlineNode):
     """
@@ -14,27 +14,24 @@ class DiscreteExplorerNode(mdp.OnlineNode):
     sampling actions at random.
 
     """
-    def __init__(self, n_actions, prob_vec=None, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
+
+    def __init__(self, n_actions, prob_vec=None, input_dim=None, dtype=None, numx_rng=None):
         """
         n_actions - Number of actions.
         prob_vec - Probability of individual action selection (default is uniform).
         """
-        super(DiscreteExplorerNode, self).__init__(input_dim, output_dim, dtype, numx_rng)
-        self.n_actions=n_actions
+        super(DiscreteExplorerNode, self).__init__(input_dim=input_dim, output_dim=None, dtype=dtype,
+                                                   numx_rng=numx_rng)
+        self.n_actions = n_actions
         if prob_vec is None:
             self._prob_vec = mdp.numx.ones(self.n_actions) / float(self.n_actions)
         else:
             self._prob_vec = prob_vec
-
         self._output_dim = 1
-
-    def _get_supported_dtypes(self):
-        return mdp.utils.get_dtypes('AllInteger') + mdp.utils.get_dtypes('Float')
 
     def _roulette_wheel(self, prob_vec):
         rnd_nr = self.numx_rng.rand()
         pi = 0.
-        pj = 0.
         indx = None
         for i in xrange(len(prob_vec)):
             pj = prob_vec[i]
@@ -45,6 +42,10 @@ class DiscreteExplorerNode(mdp.OnlineNode):
                 pi += pj
         return indx
 
+    @staticmethod
+    def is_invertible():
+        return False
+
     def _train(self, x):
         pass
 
@@ -52,11 +53,13 @@ class DiscreteExplorerNode(mdp.OnlineNode):
         if prob_vec is None:
             prob_vec = self._prob_vec
         if isinstance(prob_vec, list) or (prob_vec.ndim == 1):
-            return mdp.numx.reshape([self._roulette_wheel(prob_vec) for _ in xrange(x.shape[0])], [x.shape[0],1])
+            return mdp.numx.array([[self._roulette_wheel(prob_vec)] for _ in xrange(x.shape[0])], dtype=self.dtype)
         else:
-            if prob_vec.shape != (x.shape[0],self.n_actions):
-                raise mdp.NodeException("prob_vec has wrong shape, given %s required %s"%(str(prob_vec.shape), str((x.shape[0], self.n_actions))))
-            return mdp.numx.reshape([self._roulette_wheel(prob_vec[i]) for i in xrange(x.shape[0])], [x.shape[0], 1])
+            if prob_vec.shape != (x.shape[0], self.n_actions):
+                raise mdp.NodeException("prob_vec has wrong shape, given %s required %s" % (str(prob_vec.shape),
+                                                                                            str((x.shape[0],
+                                                                                                 self.n_actions))))
+            return mdp.numx.array([[self._roulette_wheel(prob_vec[i])] for i in xrange(x.shape[0])], dtype=self.dtype)
 
 
 class ContinuousExplorerNode(mdp.OnlineNode):
@@ -71,30 +74,31 @@ class ContinuousExplorerNode(mdp.OnlineNode):
     provide a probability distribution function for sampling actions at random.
 
     """
-    def __init__(self, action_lims, momentum=0., dstr_fn=None, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
+
+    def __init__(self, action_lims, momentum=0., dstr_fn=None, input_dim=None, dtype=None, numx_rng=None):
         """
         action_lims - Lower and upper bounds for all action dimensions. Eg. [(min1, min2, ...,), (max1, max2, ...,)]
         momentum - Momemtum parameter (mass) for selecting actions.
         dstr_fn - A funtion that returns a real number given the min bound and max bound.
                     Eg. dstr_fn(action_lims[0], action_lims[1], shape) -> array, where mini <= array_elem_i < maxi.
         """
-        super(ContinuousExplorerNode, self).__init__(input_dim, output_dim, dtype, numx_rng)
-        #check action_lims
-        if len(action_lims) != 2:
-            raise mdp.NodeException("'action_lims' must contain two elements of a list or a tuple of lower bounds and upper bounds respectively and not %d. "%(len(action_lims)),
-                                    " Eg. [(min1, min2, ...,), (max1, max2, ...,)].")
-        if len(action_lims[0]) != len(action_lims[1]):
-            raise mdp.NodeException("Length of lower_bounds ('action_lims[0]=%d') does not match the length of upper_bounds ('action_lims[1]=%d)."%(len(action_lims[0]), len(action_lims[1])))
+        super(ContinuousExplorerNode, self).__init__(input_dim=input_dim, output_dim=None, dtype=dtype,
+                                                     numx_rng=numx_rng)
 
-        self.action_lims = action_lims
+        if len(action_lims) != 2:
+            raise mdp.NodeException("'action_lims' has %d elements given, required 2 "
+                                    "[(lower1, lower2, ...,), (upper1, upper2, ...,)]" % (len(action_lims)))
+        if mdp.numx.isscalar(action_lims[0]):
+            action_lims = [tuple((lim,)) for lim in action_lims]
+        if len(action_lims[0]) != len(action_lims[1]):
+            raise mdp.NodeException("Length of lower_bounds ('action_lims[0]=%d') does not match the length "
+                                    "of the upper_bounds ('action_lims[1]=%d)." % (len(action_lims[0]), len(action_lims[1])))
+        self.action_lims = mdp.numx.asarray(action_lims)
         self._m = momentum
         self._dstr_fn = dstr_fn
         self._action = None
 
         self._output_dim = len(action_lims[0])
-
-    def _get_supported_dtypes(self):
-        return mdp.utils.get_dtypes('AllInteger') + mdp.utils.get_dtypes('Float')
 
     @property
     def dstr_fn(self):
@@ -106,13 +110,15 @@ class ContinuousExplorerNode(mdp.OnlineNode):
             return
         else:
             if not callable(fn):
-                raise mdp.NodeException("Given dstr_fn is not callable. It must of a function that returns an action array.")
+                raise mdp.NodeException(
+                    "Given dstr_fn is not callable. It must of a function that returns an action array.")
             # check if the samples returned are within the specified bounds.
-            a = fn(self.action_lims[0], self.action_lims[1], (10,self.input_dim))
-            for i in xrange(self.input_dim):
-                if (a[:,i].min() < self.action_lims[0][i]) or (a[:,i].min() >= self.action_lims[1][i]):
-                    raise mdp.NodeException("Out of bounds error. Given dstr_fn returns an action %d outside a specified"
-                                            "bounds (%d, %d) " % (a[:,i].min(), self.action_lims[0][i], self.action_lims[1][i]))
+            a = fn(self.action_lims[0], self.action_lims[1], (10, self.output_dim))
+            for i in xrange(self.output_dim):
+                if (a[:, i].min() < self.action_lims[0][i]) or (a[:, i].min() >= self.action_lims[1][i]):
+                    raise mdp.NodeException(
+                        "Out of bounds error. Given dstr_fn returns an action %d outside a specified"
+                        "bounds (%d, %d) " % (a[:, i].min(), self.action_lims[0][i], self.action_lims[1][i]))
             # if no exceptions raised
             self._dstr_fn = fn
 
@@ -122,22 +128,27 @@ class ContinuousExplorerNode(mdp.OnlineNode):
 
         if self._action is None:
             # prev action
-            self._action = self.dstr_fn(self.action_lims[0], self.action_lims[1], [1, self.input_dim])
+            self._action = self.dstr_fn(self.action_lims[0], self.action_lims[1], [1, self.output_dim])
+
+    @staticmethod
+    def is_invertible():
+        return False
 
     def _train(self, x):
         pass
 
     def _execute(self, x):
         if self._m == 0:
-            return self._dstr_fn(self.action_lims[0], self.action_lims[1], x.shape)
+            return self._dstr_fn(self.action_lims[0], self.action_lims[1],
+                                 [x.shape[0], self.output_dim]).astype(self.dtype)
         else:
-            action = mdp.numx.zeros((x.shape[0]+1, self.output_dim))
+            action = mdp.numx.zeros((x.shape[0] + 1, self.output_dim))
             action[0] = self._action
             for i in xrange(x.shape[0]):
-                new_action = self.dstr_fn(self.action_lims[0], self.action_lims[1], [1, self.input_dim])
-                action[i+1] = self._m*action[i] + (1-self._m)*new_action
+                new_action = self.dstr_fn(self.action_lims[0], self.action_lims[1], [1, self.output_dim])
+                action[i + 1] = self._m * action[i] + (1 - self._m) * new_action
             self._action = action[-1]
-            return action[1:]
+            return self._refcast(action[1:])
 
 
 class EpsilonGreedyDiscreteExplorerNode(DiscreteExplorerNode):
@@ -158,24 +169,25 @@ class EpsilonGreedyDiscreteExplorerNode(DiscreteExplorerNode):
     An introduction. Vol. 1. No. 1. Cambridge: MIT press, 1998.
 
     """
-    def __init__(self, n_actions, epsilon=1., decay=0.999, prob_vec=None, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
+
+    def __init__(self, n_actions, epsilon=1., decay=0.999, prob_vec=None, dtype=None, numx_rng=None):
         """
         epsilon - Parameter that balances exploration vs exploitation.
         decay - Decay constant of epsilon. Epsilon decays exponentially.
         """
-        super(EpsilonGreedyDiscreteExplorerNode, self).__init__(n_actions=n_actions, prob_vec=prob_vec, input_dim=input_dim,
-                                                                output_dim=output_dim, dtype=dtype, numx_rng=numx_rng)
-        self.epsilon=epsilon
-        self.decay=decay
-
+        super(EpsilonGreedyDiscreteExplorerNode, self).__init__(n_actions=n_actions, prob_vec=prob_vec,
+                                                                input_dim=None, dtype=dtype, numx_rng=numx_rng)
+        self.epsilon = epsilon
+        self.decay = decay
+        self._input_dim = self._output_dim
 
     def _train(self, x):
-        self.epsilon*=self.decay**x.shape[0]
+        self.epsilon *= self.decay ** x.shape[0]
 
     def _execute(self, x, prob_vec=None):
-        f = (self.numx_rng.rand(x.shape[0],1) < self.epsilon)
-        return f*super(EpsilonGreedyDiscreteExplorerNode, self)._execute(x, prob_vec) + (1-f)*x
-
+        f = (self.numx_rng.rand(x.shape[0], 1) < self.epsilon)
+        out = f * super(EpsilonGreedyDiscreteExplorerNode, self)._execute(x, prob_vec) + (1. - f) * x
+        return self._refcast(out)
 
 class EpsilonGreedyContinuousExplorerNode(ContinuousExplorerNode):
     """
@@ -195,25 +207,26 @@ class EpsilonGreedyContinuousExplorerNode(ContinuousExplorerNode):
     An introduction. Vol. 1. No. 1. Cambridge: MIT press, 1998.
 
     """
-    def __init__(self, action_lims, epsilon=1., decay=0.999, momentum=0., dstr_fn=None, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
+
+    def __init__(self, action_lims, epsilon=1., decay=0.999, momentum=0., dstr_fn=None, dtype=None, numx_rng=None):
         """
         epsilon - Parameter that balances exploration vs exploitation.
         decay - Decay constant of epsilon. Epsilon decays exponentially.
         """
         super(EpsilonGreedyContinuousExplorerNode, self).__init__(action_lims, momentum=momentum, dstr_fn=dstr_fn,
-                                                                  input_dim=input_dim, output_dim=output_dim, dtype=dtype,numx_rng=numx_rng)
+                                                                  dtype=dtype, numx_rng=numx_rng)
 
-        self.epsilon=epsilon
-        self.decay=decay
-
+        self.epsilon = epsilon
+        self.decay = decay
+        self._input_dim = self._output_dim
 
     def _train(self, x):
-        self.epsilon*=self.decay**x.shape[0]
+        self.epsilon *= self.decay ** x.shape[0]
 
     def _execute(self, x):
-        f = (self.numx_rng.rand(x.shape[0],1) < self.epsilon)
-        return f*super(EpsilonGreedyContinuousExplorerNode, self)._execute(x) + (1-f)*x
-
+        f = (self.numx_rng.rand(x.shape[0], 1) < self.epsilon)
+        out = f * super(EpsilonGreedyContinuousExplorerNode, self)._execute(x) + (1 - f) * x
+        return self._refcast(out)
 
 
 class BoltzmannDiscreteExplorerNode(DiscreteExplorerNode):
@@ -232,32 +245,31 @@ class BoltzmannDiscreteExplorerNode(DiscreteExplorerNode):
 
     """
 
-
-    def __init__(self, n_actions, temperature=50., decay=0.999, input_dim=None, output_dim=None, dtype=None,numx_rng=None):
+    def __init__(self, n_actions, temperature=50., decay=0.999, dtype=None, numx_rng=None):
         """
         temperature - Parameter that balances exploration vs exploitation.
         decay - Decay constant of epsilon. Epsilon decays exponentially.
         """
-        super(BoltzmannDiscreteExplorerNode, self).__init__(n_actions=n_actions, prob_vec=None, input_dim=input_dim,
-                                                                output_dim=output_dim, dtype=dtype, numx_rng=numx_rng)
+        super(BoltzmannDiscreteExplorerNode, self).__init__(n_actions=n_actions, prob_vec=None, input_dim=None,
+                                                            dtype=dtype, numx_rng=numx_rng)
         self.temperature = temperature
-        self.decay = decay
+        self.decay = float(decay)
 
         # input 'x' must be a vector of action or state values for each action.
         self._input_dim = n_actions
         self._output_dim = 1
 
     def _train(self, x):
-        self.temperature*=self.decay**x.shape[0]
+        self.temperature *= self.decay ** x.shape[0]
 
     def _execute(self, x, prob_vec=None):
         e = mdp.numx.e
         if self.temperature < 0.01:
-            return mdp.numx.argmax(x, axis=1)[:,None]
+            return self._refcast(mdp.numx.argmax(x, axis=1)[:, None])
         else:
-            _p = x/self.temperature
-            prob_vec = mdp.numx.power(e, _p)/mdp.numx.sum(mdp.numx.power(e,_p), axis=1)[:,None]
-            return super(BoltzmannDiscreteExplorerNode, self)._execute(x, prob_vec=prob_vec)
+            _p = x / self.temperature
+            prob_vec = mdp.numx.power(e, _p) / mdp.numx.sum(mdp.numx.power(e, _p), axis=1, keepdims=True)
+            return super(BoltzmannDiscreteExplorerNode, self)._execute(self._refcast(x), prob_vec=prob_vec)
 
 
 class GaussianContinuousExplorereNode(ContinuousExplorerNode):
@@ -275,26 +287,32 @@ class GaussianContinuousExplorereNode(ContinuousExplorerNode):
     An introduction. Vol. 1. No. 1. Cambridge: MIT press, 1998.
 
     """
-    def __init__(self, action_lims, sigma=None, decay=0.999, momentum=0., dstr_fn=None, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
+
+    def __init__(self, action_lims, sigma=None, decay=0.999, momentum=0., dstr_fn=None, dtype=None,
+                 numx_rng=None):
         """
         epsilon - Parameter that balances exploration vs exploitation.
         decay - Decay constant of epsilon. Epsilon decays exponentially.
         """
         super(GaussianContinuousExplorereNode, self).__init__(action_lims, momentum=momentum, dstr_fn=dstr_fn,
-                                                                  input_dim=input_dim, output_dim=output_dim, dtype=dtype,numx_rng=numx_rng)
+                                                              input_dim=None, dtype=dtype, numx_rng=numx_rng)
 
         if sigma is None:
-            self.sigma=mdp.numx.ones(len(action_lims))
+            self.sigma = mdp.numx.ones(len(action_lims[0]))
         elif mdp.numx.isscalar(sigma):
-            self.sigma=mdp.numx.ones(len(action_lims))*sigma
-        self.decay=decay
+            self.sigma = mdp.numx.ones(len(action_lims[0])) * sigma
+        self.decay = decay
 
-        self._input_dim = len(action_lims)
-        self._output_dim = len(action_lims)
+        self._input_dim = len(action_lims[0])
+        self._output_dim = len(action_lims[0])
+
+    def _get_supported_dtypes(self):
+        return mdp.utils.get_dtypes('Float')
 
     def _train(self, x):
-        self.sigma*=self.decay**x.shape[0]
+        self.sigma *= self.decay ** x.shape[0]
 
     def _execute(self, x):
-        return x + self.numx_rng.multivariate_normal(mdp.numx.zeros(self.input_dim), mdp.numx.diag(self.sigma), x.shape[0])
-
+        out = x + self.numx_rng.multivariate_normal(mdp.numx.zeros(self.output_dim), mdp.numx.diag(self.sigma),
+                                                     x.shape[0])
+        return self._refcast(out)

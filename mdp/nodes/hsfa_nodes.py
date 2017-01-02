@@ -1,11 +1,14 @@
-
-import mdp
+import os
+import tempfile
 import warnings as _warnings
-import webbrowser, os, tempfile
+import webbrowser
+import mdp
+
 
 class HSFANode(mdp.Node):
-    def __init__(self, in_channels_xy, field_channels_xy, field_spacing_xy, n_features, in_channel_dim=1, n_training_fields=None, field_dstr='uniform', output_2d=True):
-        super(HSFANode, self).__init__(input_dim=None, output_dim=None, dtype=None)
+    def __init__(self, in_channels_xy, field_channels_xy, field_spacing_xy, n_features, in_channel_dim=1,
+                 n_training_fields=None, field_dstr='uniform', output_2d=True, dtype=None):
+        super(HSFANode, self).__init__(input_dim=None, output_dim=None, dtype=dtype)
 
         self.field_channels_xy = field_channels_xy
         self.in_channels_xy = in_channels_xy
@@ -41,24 +44,28 @@ class HSFANode(mdp.Node):
             self._output_dim = self.output_shape
 
     def _init_default_net(self):
-        if self.field_channels_xy[0] == (-1,-1):
-            sb = mdp.hinet.Rectangular2dSwitchboard(self.in_channels_xy, self.in_channels_xy, (1,1), self.in_channel_dim, True)
+        if self.field_channels_xy[0] == (-1, -1):
+            sb = mdp.hinet.Rectangular2dSwitchboard(self.in_channels_xy, self.in_channels_xy, (1, 1),
+                                                    self.in_channel_dim, True)
         else:
-            sb = mdp.hinet.Rectangular2dSwitchboard(self.in_channels_xy, self.field_channels_xy[0], self.field_spacing_xy[0], self.in_channel_dim,True)
+            sb = mdp.hinet.Rectangular2dSwitchboard(self.in_channels_xy, self.field_channels_xy[0],
+                                                    self.field_spacing_xy[0], self.in_channel_dim, True)
         ln = self._hinet_node(sb.out_channel_dim, self.n_features[0])
         cl = mdp.hinet.CloneLayer(ln, n_nodes=sb.output_channels)
         n_training_fields = [sb.output_channels]
-        node = mdp.hinet.FlowNode(mdp.Flow([sb, cl]))
+        node = mdp.hinet.FlowNode(mdp.Flow([sb, cl]), dtype=self.dtype)
         layers = [node]
         for i in xrange(1, self.n_layers):
             if self.field_channels_xy[i] == (-1, -1):
-                sb = mdp.hinet.Rectangular2dSwitchboard(sb.out_channels_xy, sb.out_channels_xy, (1,1), ln.output_dim, True)
+                sb = mdp.hinet.Rectangular2dSwitchboard(sb.out_channels_xy, sb.out_channels_xy, (1, 1), ln.output_dim,
+                                                        True)
             else:
-                sb = mdp.hinet.Rectangular2dSwitchboard(sb.out_channels_xy, self.field_channels_xy[i], self.field_spacing_xy[i], ln.output_dim, True)
+                sb = mdp.hinet.Rectangular2dSwitchboard(sb.out_channels_xy, self.field_channels_xy[i],
+                                                        self.field_spacing_xy[i], ln.output_dim, True)
             ln = self._hinet_node(sb.out_channel_dim, self.n_features[i])
             cl = mdp.hinet.CloneLayer(ln, n_nodes=sb.output_channels)
             n_training_fields.append(sb.output_channels)
-            node = mdp.hinet.FlowNode(mdp.Flow([sb, cl]))
+            node = mdp.hinet.FlowNode(mdp.Flow([sb, cl]), dtype=self.dtype)
             layers.append(node)
         input_shape = (self.in_channels_xy[0], self.in_channels_xy[1], self.in_channel_dim)
         output_shape = (sb.out_channels_xy[0], sb.out_channels_xy[1], ln.output_dim)
@@ -67,22 +74,29 @@ class HSFANode(mdp.Node):
     def _init_random_sampling_net(self):
         if not hasattr(self, '_default_net'):
             raise mdp.NodeException("'_init_random_sampling_net' must be called after '_init_default_net'")
-        if self.field_channels_xy[0] == (-1,-1):
-            sb = mdp.hinet.RandomChannelSwitchboard(self.in_channels_xy, self.in_channels_xy, in_channel_dim=self.in_channel_dim, out_channels=1, field_dstr=self.field_dstr)
+        if self.field_channels_xy[0] == (-1, -1):
+            sb = mdp.hinet.RandomChannelSwitchboard(self.in_channels_xy, self.in_channels_xy,
+                                                    in_channel_dim=self.in_channel_dim, out_channels=1,
+                                                    field_dstr=self.field_dstr)
         else:
-            sb = mdp.hinet.RandomChannelSwitchboard(self.in_channels_xy, self.field_channels_xy[0], in_channel_dim=self.in_channel_dim, out_channels=self.n_training_fields[0], field_dstr=self.field_dstr)
+            sb = mdp.hinet.RandomChannelSwitchboard(self.in_channels_xy, self.field_channels_xy[0],
+                                                    in_channel_dim=self.in_channel_dim,
+                                                    out_channels=self.n_training_fields[0], field_dstr=self.field_dstr)
         cl = mdp.hinet.CloneLayer(self._default_net[0].flow[1].node, n_nodes=sb.output_channels)
         node = mdp.hinet.FlowNode(mdp.Flow([sb, cl]))
         layers = [node]
         for i in xrange(1, self.n_layers):
             if self.field_channels_xy[i] == (-1, -1):
-                sb = mdp.hinet.RandomChannelSwitchboard(self._default_net[i-1].flow[0].out_channels_xy, self._default_net[i-1].flow[0].out_channels_xy,
-                                                in_channel_dim=self._default_net[i-1].flow[1].node.output_dim, out_channels=1, field_dstr=self.field_dstr)
+                sb = mdp.hinet.RandomChannelSwitchboard(self._default_net[i - 1].flow[0].out_channels_xy,
+                                                        self._default_net[i - 1].flow[0].out_channels_xy,
+                                                        in_channel_dim=self._default_net[i - 1].flow[1].node.output_dim,
+                                                        out_channels=1, field_dstr=self.field_dstr)
             else:
                 sb = mdp.hinet.RandomChannelSwitchboard(self._default_net[i - 1].flow[0].out_channels_xy,
-                                                    self.field_channels_xy[i],
-                                                    in_channel_dim=self._default_net[i - 1].flow[1].node.output_dim,
-                                                    out_channels=self.n_training_fields[i], field_dstr=self.field_dstr)
+                                                        self.field_channels_xy[i],
+                                                        in_channel_dim=self._default_net[i - 1].flow[1].node.output_dim,
+                                                        out_channels=self.n_training_fields[i],
+                                                        field_dstr=self.field_dstr)
             cl = mdp.hinet.CloneLayer(self._default_net[i].flow[1].node, n_nodes=sb.output_channels)
             node = mdp.hinet.FlowNode(mdp.Flow([sb, cl]))
             layers.append(node)
@@ -98,6 +112,7 @@ class HSFANode(mdp.Node):
                     else:
                         outdims.append(node.output_dim)
             return tuple(outdims)
+
         sb, cln = self._execution_flow[0].flow[:2]
         self.in_channel_xy = sb.in_channels_xy
         self.in_channel_dim = sb.in_channel_dim
@@ -106,8 +121,8 @@ class HSFANode(mdp.Node):
         self.n_features = [get_output_dims_from_flownode(cln.node)]
         self.n_layers = len(self._execution_flow)
         n_training_fields = [self._training_flow[0].flow[0].output_channels]
-        for i in xrange(1,self.n_layers):
-            sb,cln = self._execution_flow[i].flow[:2]
+        for i in xrange(1, self.n_layers):
+            sb, cln = self._execution_flow[i].flow[:2]
             self.field_channels_xy.append(sb.field_channels_xy)
             self.field_spacing_xy.append(sb.field_spacing_xy)
             self.n_features.append(get_output_dims_from_flownode(cln.node))
@@ -121,7 +136,8 @@ class HSFANode(mdp.Node):
     def _check_n_training_fields(self):
         for i in xrange(len(self._rec_n_training_fields)):
             if self.n_training_fields[i] < self._rec_n_training_fields[i]:
-                _warnings.warn("\nRecommended n_training_field for layer %d is %d, %d given."%(i, self._rec_n_training_fields[i], self.n_training_fields[i]))
+                _warnings.warn("\nRecommended n_training_field for layer "
+                               "%d is %d, %d given." % (i, self._rec_n_training_fields[i], self.n_training_fields[i]))
 
     def _x_to_layersx(self, x, xname):
         """
@@ -147,47 +163,56 @@ class HSFANode(mdp.Node):
         if list: check if the list has n_layers elements and each element is a 2tuple
         """
         if mdp.numx.isscalar(xy) or (xy is None):
-            xy = [(xy,xy)]* self.n_layers
+            xy = [(xy, xy)] * self.n_layers
         elif isinstance(xy, tuple):
-            xy = [xy]* self.n_layers
+            xy = [xy] * self.n_layers
         if not isinstance(xy, list):
             err_str = ("'%s' must be a list of 2-tuples"
-                       ", and not %s" %(xyname, type(xy)))
+                       ", and not %s" % (xyname, type(xy)))
             raise mdp.NodeException(err_str)
         if not (len(xy) == self.n_layers):
             raise mdp.NodeException("%d '%s' elements needed, "
-                                    "%d given."%(self.n_layers, xyname, len(xy)))
+                                    "%d given." % (self.n_layers, xyname, len(xy)))
         # check that all elements are 2-tuples
         for i, tup in enumerate(xy):
             if not (len(tup) == 2):
                 err = ("Element number %d in the '%s'"
-                       " list is not a 2tuple." %(i, xyname))
+                       " list is not a 2tuple." % (i, xyname))
                 raise mdp.NodeException(err)
 
         return xy
 
     def _hinet_node(self, input_dim, n_features):
-        if mdp.numx.isscalar(n_features): n_features = [n_features]
+        if mdp.numx.isscalar(n_features):
+            n_features = [n_features]
         n_features = list(n_features)
         flow = []
-        if (n_features[0] == -1): n_features[0] = input_dim
-        if (n_features[0] > input_dim):
-            _warnings.warn("\nNumber of output features of SFA1 node (%d) is greater than its input_dim (%d). Setting them equal."%(n_features[0], input_dim))
-            sfa1_node = mdp.nodes.SFANode(input_dim=input_dim,output_dim=input_dim)
+        if n_features[0] == -1:
+            n_features[0] = input_dim
+        if n_features[0] > input_dim:
+            _warnings.warn(
+                "\nNumber of output features of SFA1 node (%d) is greater than its input_dim (%d). "
+                "Setting them equal." % (n_features[0], input_dim))
+            sfa1_node = mdp.nodes.SFANode(input_dim=input_dim, output_dim=input_dim, dtype=self.dtype)
         else:
-            sfa1_node = mdp.nodes.SFANode(input_dim=input_dim,output_dim=n_features[0])
+            sfa1_node = mdp.nodes.SFANode(input_dim=input_dim, output_dim=n_features[0], dtype=self.dtype)
         flow.append(sfa1_node)
 
         if len(n_features) > 1:
-            exp_node = mdp.nodes.QuadraticExpansionNode(input_dim=sfa1_node.output_dim)
-            if (n_features[1] == -1): n_features[1] = exp_node.output_dim
-            if (n_features[1] > exp_node.output_dim):
-                _warnings.warn("\nNumber of output features of SFA2 node (%d) is greater than its input_dim (%d). Setting them equal."%(n_features[1], exp_node.output_dim))
-                sfa2_node = mdp.nodes.SFANode(input_dim=exp_node.output_dim,output_dim=exp_node.output_dim)
+            exp_node = mdp.nodes.QuadraticExpansionNode(input_dim=sfa1_node.output_dim, dtype=self.dtype)
+            if n_features[1] == -1:
+                n_features[1] = exp_node.output_dim
+            if n_features[1] > exp_node.output_dim:
+                _warnings.warn(
+                    "\nNumber of output features of SFA2 node (%d) is greater than its input_dim (%d). "
+                    "Setting them equal." % (n_features[1], exp_node.output_dim))
+                sfa2_node = mdp.nodes.SFANode(input_dim=exp_node.output_dim, output_dim=exp_node.output_dim,
+                                              dtype=self.dtype)
             else:
-                sfa2_node = mdp.nodes.SFANode(input_dim=exp_node.output_dim,output_dim=n_features[1])
+                sfa2_node = mdp.nodes.SFANode(input_dim=exp_node.output_dim, output_dim=n_features[1],
+                                              dtype=self.dtype)
             flow.extend([exp_node, sfa2_node])
-        node = mdp.hinet.FlowNode(mdp.Flow(flow))
+        node = mdp.hinet.FlowNode(mdp.Flow(flow), dtype=self.dtype)
         return node
 
     @property
@@ -198,14 +223,9 @@ class HSFANode(mdp.Node):
     def output_shape(self):
         return self._output_shape
 
-
-    def is_trainable(self):
-        return True
-
-
-    def is_invertible(self):
+    @staticmethod
+    def is_invertible():
         return False
-
 
     def _get_train_seq(self):
         """Return a training sequence containing all training phases."""
@@ -218,6 +238,7 @@ class HSFANode(mdp.Node):
                 if _i_node > 0:
                     x = self._execution_flow.execute(x, nodenr=_i_node - 1)
                 _node.train(x + 0.0001 * mdp.numx_rand.randn(*x.shape), *args, **kwargs)
+
             return _train
 
         train_seq = []
@@ -231,7 +252,7 @@ class HSFANode(mdp.Node):
     def _execute(self, x, n=None):
         return self._execution_flow.execute(x, nodenr=n)
 
-    ###### string representation
+    # string representation
 
     def __str__(self):
         netstr = ""
@@ -257,27 +278,30 @@ class HSFANode(mdp.Node):
         layer_input_shapes += "]"
         hinet_dims += "]"
         netstr += hinet_dims + layer_input_shapes
-        netstr += "\nnum_training_fields=%s, recommended_min=%s"%(str(self.n_training_fields), str(self._rec_n_training_fields))
+        netstr += "\nnum_training_fields=%s, " % str(self.n_training_fields)
+        netstr += "recommended_min=%s" % str(self._rec_n_training_fields)
         return netstr
 
     def __repr__(self):
         name = type(self).__name__
-        in_channels_xy = "in_channels_xy=%s"%str(self.in_channels_xy)
-        field_channels_xy = "field_channels_xy=%s"%str(self.field_channels_xy)
-        field_spacing_xy = "field_spacing_xy=%s"%str(self.field_spacing_xy)
-        n_features = "\nn_features=%s"%str(self.n_features)
-        in_channel_dim = "in_channel_dim=%s"%str(self.in_channel_dim)
-        n_training_fields= "n_training_fields=%s"%str(self.n_training_fields)
-        field_dstr = "field_dstr='%s'"%str(self.field_dstr)
-        output_2d = "output_2d=%s"%str(self.output_2d)
-        args = ', '.join((in_channels_xy, field_channels_xy, field_spacing_xy, n_features, in_channel_dim, n_training_fields, field_dstr, output_2d))
+        in_channels_xy = "in_channels_xy=%s" % str(self.in_channels_xy)
+        field_channels_xy = "field_channels_xy=%s" % str(self.field_channels_xy)
+        field_spacing_xy = "field_spacing_xy=%s" % str(self.field_spacing_xy)
+        n_features = "\nn_features=%s" % str(self.n_features)
+        in_channel_dim = "in_channel_dim=%s" % str(self.in_channel_dim)
+        n_training_fields = "n_training_fields=%s" % str(self.n_training_fields)
+        field_dstr = "field_dstr='%s'" % str(self.field_dstr)
+        output_2d = "output_2d=%s" % str(self.output_2d)
+        args = ', '.join((in_channels_xy, field_channels_xy, field_spacing_xy, n_features, in_channel_dim,
+                          n_training_fields, field_dstr, output_2d))
         return name + '(' + args + ')'
 
-    ###### html representation
+    # html representation
 
-    def _css(self):
+    @staticmethod
+    def _css():
         """Return the class CSS."""
-        css_filename = os.path.join(os.path.split(__file__)[0],"basic.css")
+        css_filename = os.path.join(os.path.split(__file__)[0], "basic.css")
         with open(css_filename, 'r') as css_file:
             css = css_file.read()
         return css
@@ -312,7 +336,7 @@ class HSFANode(mdp.Node):
             for i in xrange(len(self._training_flow)):
                 converter = mdp.hinet.HiNetHTMLVisitor(html_file, show_size=show_size)
                 if i > 0:
-                    html_file.write('<h5>Input from execution layer-%d</h5>'%(i-1))
+                    html_file.write('<h5>Input from execution layer-%d</h5>' % (i - 1))
                 converter.convert_flow(flow=self._training_flow[i])
             html_file.write('</tr></td></table>\n')
             html_file.write('<table class=\"flow1\"><tr><td>\n')
@@ -329,7 +353,7 @@ class HSFANode(mdp.Node):
             webbrowser.open(filename)
         return filename
 
-    ###### private container methods
+    # private container methods
 
     def __len__(self):
         return self.n_layers
@@ -376,7 +400,7 @@ class HSFANode(mdp.Node):
             self._training_flow = self._init_random_sampling_net()
         self._set_args_from_net()
 
-    ###### public container methods
+    # public container methods
 
     def append(self, x):
         """apend layer to the node end"""
@@ -387,7 +411,7 @@ class HSFANode(mdp.Node):
         elements from the iterable"""
         if not isinstance(x, mdp.Flow):
             err_str = ('can only concatenate flow'
-                       ' (not \'%s\') to flow' % (type(x).__name__))
+                       ' (not \'%s\') to flow' % type(x).__name__)
             raise TypeError(err_str)
         self[len(self):len(self)] = x
 
@@ -397,59 +421,78 @@ class HSFANode(mdp.Node):
 
 
 class HSFAPoolNode(HSFANode):
-    def __init__(self, in_channels_xy, field_channels_xy, field_spacing_xy, n_features, pool_channels_xy, 
-                 in_channel_dim=1, pool_spacing_xy=None, pool_mode='max', n_training_fields=None, field_dstr='uniform', output_2d=True):
+    def __init__(self, in_channels_xy, field_channels_xy, field_spacing_xy, n_features, pool_channels_xy,
+                 in_channel_dim=1, pool_spacing_xy=None, pool_mode='max', n_training_fields=None, field_dstr='uniform',
+                 output_2d=True, dtype=None):
         self.n_layers = len(field_channels_xy)
         self.pool_mode = pool_mode
         self.pool_channels_xy = self._xy_to_layersxy(pool_channels_xy, 'pool_channels_xy')
         self.pool_spacing_xy = self._xy_to_layersxy(pool_spacing_xy, 'pool_spacing_xy')
-        super(HSFAPoolNode, self).__init__(in_channels_xy, field_channels_xy, field_spacing_xy, n_features, in_channel_dim=in_channel_dim,
-                     n_training_fields=n_training_fields, field_dstr=field_dstr, output_2d=output_2d)
+        super(HSFAPoolNode, self).__init__(in_channels_xy, field_channels_xy, field_spacing_xy, n_features,
+                                           in_channel_dim=in_channel_dim,
+                                           n_training_fields=n_training_fields, field_dstr=field_dstr,
+                                           output_2d=output_2d, dtype=dtype)
 
     def _init_default_net(self):
-        if self.field_channels_xy[0] == (-1,-1):
-            sb = mdp.hinet.Rectangular2dSwitchboard(self.in_channels_xy, self.in_channels_xy, (1,1), self.in_channel_dim, True)
+        if self.field_channels_xy[0] == (-1, -1):
+            sb = mdp.hinet.Rectangular2dSwitchboard(self.in_channels_xy, self.in_channels_xy, (1, 1),
+                                                    self.in_channel_dim, True)
         else:
-            sb = mdp.hinet.Rectangular2dSwitchboard(self.in_channels_xy, self.field_channels_xy[0], self.field_spacing_xy[0], self.in_channel_dim,True)
+            sb = mdp.hinet.Rectangular2dSwitchboard(self.in_channels_xy, self.field_channels_xy[0],
+                                                    self.field_spacing_xy[0], self.in_channel_dim, True)
         ln = self._hinet_node(sb.out_channel_dim, self.n_features[0])
         cl = mdp.hinet.CloneLayer(ln, n_nodes=sb.output_channels)
         rec_n_training_fields = [sb.output_channels]
-        pool = mdp.hinet.Pool2D(in_channels_xy=sb.out_channels_xy, field_channels_xy=self.pool_channels_xy[0], field_spacing_xy=self.pool_spacing_xy[0], in_channel_dim=ln.output_dim, mode=self.pool_mode)
-        node = mdp.hinet.FlowNode(mdp.Flow([sb, cl, pool]))
+        pool = mdp.hinet.Pool2D(in_channels_xy=sb.out_channels_xy, field_channels_xy=self.pool_channels_xy[0],
+                                field_spacing_xy=self.pool_spacing_xy[0], in_channel_dim=ln.output_dim,
+                                mode=self.pool_mode)
+        node = mdp.hinet.FlowNode(mdp.Flow([sb, cl, pool]), dtype=self.dtype)
         layers = [node]
         for i in xrange(1, self.n_layers):
             if self.field_channels_xy[i] == (-1, -1):
-                sb = mdp.hinet.Rectangular2dSwitchboard(pool.out_channels_xy, pool.out_channels_xy, (1,1), ln.output_dim, True)
+                sb = mdp.hinet.Rectangular2dSwitchboard(pool.out_channels_xy, pool.out_channels_xy, (1, 1),
+                                                        ln.output_dim, True)
             else:
-                sb = mdp.hinet.Rectangular2dSwitchboard(pool.out_channels_xy, self.field_channels_xy[i], self.field_spacing_xy[i], ln.output_dim, True)
+                sb = mdp.hinet.Rectangular2dSwitchboard(pool.out_channels_xy, self.field_channels_xy[i],
+                                                        self.field_spacing_xy[i], ln.output_dim, True)
             ln = self._hinet_node(sb.out_channel_dim, self.n_features[i])
             cl = mdp.hinet.CloneLayer(ln, n_nodes=sb.output_channels)
             rec_n_training_fields.append(sb.output_channels)
-            pool = mdp.hinet.Pool2D(in_channels_xy=sb.out_channels_xy, field_channels_xy=self.pool_channels_xy[i], field_spacing_xy=self.pool_spacing_xy[i],
-                              in_channel_dim=ln.output_dim, mode=self.pool_mode)
-            node = mdp.hinet.FlowNode(mdp.Flow([sb, cl, pool]))
+            pool = mdp.hinet.Pool2D(in_channels_xy=sb.out_channels_xy, field_channels_xy=self.pool_channels_xy[i],
+                                    field_spacing_xy=self.pool_spacing_xy[i],
+                                    in_channel_dim=ln.output_dim, mode=self.pool_mode)
+            node = mdp.hinet.FlowNode(mdp.Flow([sb, cl, pool]), dtype=self.dtype)
             layers.append(node)
         input_shape = (self.in_channels_xy[0], self.in_channels_xy[1], self.in_channel_dim)
         output_shape = (pool.out_channels_xy[0], pool.out_channels_xy[1], ln.output_dim)
         return layers, rec_n_training_fields, input_shape, output_shape
 
     def _init_random_sampling_net(self):
-        if self.field_channels_xy[0] == (-1,-1):
-            sb = mdp.hinet.RandomChannelSwitchboard(self.in_channels_xy, self.in_channels_xy, in_channel_dim=self.in_channel_dim, out_channels=1, field_dstr=self.field_dstr)
+        if self.field_channels_xy[0] == (-1, -1):
+            sb = mdp.hinet.RandomChannelSwitchboard(self.in_channels_xy, self.in_channels_xy,
+                                                    in_channel_dim=self.in_channel_dim, out_channels=1,
+                                                    field_dstr=self.field_dstr)
         else:
-            sb = mdp.hinet.RandomChannelSwitchboard(self.in_channels_xy, self.field_channels_xy[0], in_channel_dim=self.in_channel_dim, out_channels=self.n_training_fields[0], field_dstr=self.field_dstr)
+            sb = mdp.hinet.RandomChannelSwitchboard(self.in_channels_xy, self.field_channels_xy[0],
+                                                    in_channel_dim=self.in_channel_dim,
+                                                    out_channels=self.n_training_fields[0], field_dstr=self.field_dstr)
         cl = mdp.hinet.CloneLayer(self._default_net[0].flow[1].node, n_nodes=sb.output_channels)
-        node = mdp.hinet.FlowNode(mdp.Flow([sb, cl]))
+        node = mdp.hinet.FlowNode(mdp.Flow([sb, cl]), dtype=self.dtype)
         layers = [node]
         for i in xrange(1, self.n_layers):
             if self.field_channels_xy[i] == (-1, -1):
-                sb = mdp.hinet.RandomChannelSwitchboard(self._default_net[i-1].flow[2].out_channels_xy, self._default_net[i-1].flow[2].out_channels_xy,
-                                                in_channel_dim=self._default_net[i-1].flow[1].node.output_dim, out_channels=1, field_dstr=self.field_dstr)
+                sb = mdp.hinet.RandomChannelSwitchboard(self._default_net[i - 1].flow[2].out_channels_xy,
+                                                        self._default_net[i - 1].flow[2].out_channels_xy,
+                                                        in_channel_dim=self._default_net[i - 1].flow[1].node.output_dim,
+                                                        out_channels=1, field_dstr=self.field_dstr)
             else:
-                sb = mdp.hinet.RandomChannelSwitchboard(self._default_net[i-1].flow[2].out_channels_xy, self.field_channels_xy[i],
-                                                    in_channel_dim=self._default_net[i-1].flow[1].node.output_dim, out_channels=self.n_training_fields[i], field_dstr=self.field_dstr)
+                sb = mdp.hinet.RandomChannelSwitchboard(self._default_net[i - 1].flow[2].out_channels_xy,
+                                                        self.field_channels_xy[i],
+                                                        in_channel_dim=self._default_net[i - 1].flow[1].node.output_dim,
+                                                        out_channels=self.n_training_fields[i],
+                                                        field_dstr=self.field_dstr)
             cl = mdp.hinet.CloneLayer(self._default_net[i].flow[1].node, n_nodes=sb.output_channels)
-            node = mdp.hinet.FlowNode(mdp.Flow([sb, cl]))
+            node = mdp.hinet.FlowNode(mdp.Flow([sb, cl]), dtype=self.dtype)
             layers.append(node)
         return layers
 
@@ -457,7 +500,7 @@ class HSFAPoolNode(HSFANode):
         super(HSFAPoolNode, self)._set_args_from_net()
         self.pool_channels_xy = []
         self.pool_spacing_xy = []
-        for i in xrange(1,self.n_layers):
+        for i in xrange(1, self.n_layers):
             pool = self._execution_flow[i].flow[2]
             self.pool_channels_xy.append(pool.field_channels_xy)
             self.pool_spacing_xy.append(pool.field_spacing_xy)
@@ -490,23 +533,23 @@ class HSFAPoolNode(HSFANode):
         hinet_dims += "]"
         pool_input_shapes += "]"
         netstr += hinet_dims + layer_input_shapes + pool_input_shapes
-        netstr += "\nnum_training_fields=%s, recommended_min=%s"%(str(self.n_training_fields), str(self._rec_n_training_fields))
+        netstr += "\nnum_training_fields=%s, " % str(self.n_training_fields)
+        netstr += "recommended_min=%s" % str(self._rec_n_training_fields)
         return netstr
 
     def __repr__(self):
         name = type(self).__name__
-        in_channels_xy = "in_channels_xy=%s"%str(self.in_channels_xy)
-        field_channels_xy = "field_channels_xy=%s"%str(self.field_channels_xy)
-        field_spacing_xy = "field_spacing_xy=%s"%str(self.field_spacing_xy)
-        n_features = "\nn_features=%s"%str(self.n_features)
-        pool_channels_xy = "pool_channels_xy=%s"%str(self.pool_channels_xy)
-        in_channel_dim = "in_channel_dim=%s"%str(self.in_channel_dim)
-        pool_spacing_xy = "\npool_spacing_xy=%s"%str(self.pool_spacing_xy)
-        pool_mode = "pool_mode='%s'"%str(self.pool_mode)
-        n_training_fields= "n_training_fields=%s"%str(self.n_training_fields)
-        field_dstr = "field_dstr='%s'"%str(self.field_dstr)
-        output_2d = "output_2d=%s"%str(self.output_2d)
+        in_channels_xy = "in_channels_xy=%s" % str(self.in_channels_xy)
+        field_channels_xy = "field_channels_xy=%s" % str(self.field_channels_xy)
+        field_spacing_xy = "field_spacing_xy=%s" % str(self.field_spacing_xy)
+        n_features = "\nn_features=%s" % str(self.n_features)
+        pool_channels_xy = "pool_channels_xy=%s" % str(self.pool_channels_xy)
+        in_channel_dim = "in_channel_dim=%s" % str(self.in_channel_dim)
+        pool_spacing_xy = "\npool_spacing_xy=%s" % str(self.pool_spacing_xy)
+        pool_mode = "pool_mode='%s'" % str(self.pool_mode)
+        n_training_fields = "n_training_fields=%s" % str(self.n_training_fields)
+        field_dstr = "field_dstr='%s'" % str(self.field_dstr)
+        output_2d = "output_2d=%s" % str(self.output_2d)
         args = ', '.join((in_channels_xy, field_channels_xy, field_spacing_xy, n_features, pool_channels_xy,
                           in_channel_dim, pool_spacing_xy, pool_mode, n_training_fields, field_dstr, output_2d))
         return name + '(' + args + ')'
-

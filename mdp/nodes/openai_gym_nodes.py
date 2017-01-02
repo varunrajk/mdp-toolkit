@@ -1,7 +1,8 @@
-
 import mdp
 from difflib import SequenceMatcher
 import gym
+from gym import spaces
+
 
 class GymNode(mdp.OnlineNode):
     """GymNode is a thin OnlineNode wrapper over OpenAi's Gym library.
@@ -45,21 +46,22 @@ class GymNode(mdp.OnlineNode):
          Number of observations or actions for discrete types.
 
     """
-    def __init__(self, env_name, render=False, auto_reset=True, numx_rng=None):
+
+    def __init__(self, env_name, render=False, auto_reset=True, dtype=None, numx_rng=None):
         """
         env_name - Registered gym environment name. Eg. "MountainCar-v0"
         render - Enable or disable rendering. Disabled by default.
         auto_reset - Automatically resets the environment if gym env's done is True.
         """
-        super(GymNode, self).__init__(input_dim=None, output_dim=None, dtype=None, numx_rng=None)
+        super(GymNode, self).__init__(input_dim=None, output_dim=None, dtype=dtype, numx_rng=None)
 
         self._env_registry = gym.envs.registry.env_specs
-        if self._env_registry.has_key(env_name):
+        if env_name in self._env_registry.keys():
             self._env_name = env_name
         else:
             similar_envs_str = '(' + ', '.join(self._get_similar_env_names(env_name)) + ')'
             raise mdp.NodeException(
-                "Unregistered environment name. Are you looking for any of these?: \n%s" % (similar_envs_str))
+                "Unregistered environment name. Are you looking for any of these?: \n%s" % similar_envs_str)
         self.env = gym.make(self.env_name)
 
         self.render = render
@@ -69,12 +71,12 @@ class GymNode(mdp.OnlineNode):
         self.numx_rng = numx_rng
 
         # get observation dims and shape
-        if isinstance(self.env.observation_space, gym.spaces.discrete.Discrete):
+        if isinstance(self.env.observation_space, spaces.discrete.Discrete):
             self.observation_type = 'discrete'
             self.observation_dim = 1
             self.observation_shape = (1,)
             self.n_observations = self.env.observation_space.n
-            self.observation_lims = [[0],[self.n_observations-1]]
+            self.observation_lims = [[0], [self.n_observations - 1]]
         else:
             self.observation_type = 'continuous'
             self.observation_shape = self.env.observation_space.shape
@@ -83,12 +85,12 @@ class GymNode(mdp.OnlineNode):
             self.observation_lims = [self.env.observation_space.low, self.env.observation_space.high]
 
         # get action dims
-        if isinstance(self.env.action_space, gym.spaces.discrete.Discrete):
+        if isinstance(self.env.action_space, spaces.discrete.Discrete):
             self.action_type = 'discrete'
             self.action_dim = 1
             self.action_shape = (1,)
             self.n_actions = self.env.action_space.n
-            self.action_lims = [[0],[self.n_actions-1]]
+            self.action_lims = [[0], [self.n_actions - 1]]
         else:
             self.action_type = 'continuous'
             self.action_shape = self.env.action_space.shape
@@ -100,7 +102,7 @@ class GymNode(mdp.OnlineNode):
         self._input_dim = self.action_dim
 
         # set output dims
-        self._output_dim = self.observation_dim*2 + self.action_dim + 1 + 1
+        self._output_dim = self.observation_dim * 2 + self.action_dim + 1 + 1
 
         # get observation
         self._phi = mdp.numx.reshape(self.env.reset(), [1, self.observation_dim])
@@ -112,15 +114,12 @@ class GymNode(mdp.OnlineNode):
 
     @property
     def env_name(self):
-        return self._env_name   #read only
+        return self._env_name  # read only
 
     def _get_similar_env_names(self, name):
         keys = self._env_registry.keys()
         ratios = [SequenceMatcher(None, name, key).ratio() for key in keys]
         return [x for (y, x) in sorted(zip(ratios, keys), reverse=True)][:5]
-
-    def _get_supported_dtypes(self):
-        return mdp.utils.get_dtypes('AllInteger') + mdp.utils.get_dtypes('Float')
 
     def _set_numx_rng(self, rng):
         """Set a shared numx random number generator.
@@ -155,12 +154,15 @@ class GymNode(mdp.OnlineNode):
         phi_ = mdp.numx.reshape(phi_, [len(phi_), self.observation_dim])
         phi = mdp.numx.vstack((self._phi, phi_[:-1]))
         self._phi = phi_[-1:]
-        r = mdp.numx.reshape(r, [len(r),1])
+        r = mdp.numx.reshape(r, [len(r), 1])
         a = x
-        done = mdp.numx.reshape(done, [len(done),1])
-        y = mdp.numx.hstack((phi,phi_,a,r,done))
+        done = mdp.numx.reshape(done, [len(done), 1])
+        y = mdp.numx.hstack((phi, phi_, a, r, done))
         self.cache['info'] = info[-1]
-        return y
+        return self._refcast(y)
+
+    def _train(self, x):
+        pass
 
     # utility methods
 
@@ -169,9 +171,8 @@ class GymNode(mdp.OnlineNode):
         self.env.render(close=True)
 
     def get_random_actions(self, n=1):
-        return mdp.numx.reshape([self.env.action_space.sample() for _ in xrange(n)], (n, self.input_dim))
+        return self._refcast(mdp.numx.reshape([self.env.action_space.sample() for _ in xrange(n)], (n, self.input_dim)))
 
     def get_environment_samples(self, n=1):
         # Generates random environment samples
         return self.execute(self.get_random_actions(n))
-

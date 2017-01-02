@@ -14,7 +14,7 @@ class MovingAvgNode(mdp.PreserveDimOnlineNode):
       ``self.avg``
           The current average of the input data
     """
-    def __init__(self, input_dim=None, dtype=None, numx_rng=None, avg_n=None):
+    def __init__(self, avg_n=None, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
         """
         avg_n - (Default:None).
                 When set, the node updates an exponential weighted moving average.
@@ -22,14 +22,14 @@ class MovingAvgNode(mdp.PreserveDimOnlineNode):
                 represents about 86% of the total weight.
         """
 
-        super(MovingAvgNode, self).__init__(input_dim=input_dim, output_dim=None, dtype=dtype, numx_rng=numx_rng)
+        super(MovingAvgNode, self).__init__(input_dim=input_dim, output_dim=output_dim, dtype=dtype, numx_rng=numx_rng)
         self.avg_n = avg_n
         self.avg = None
         self._cache = {'avg': None}
 
     def _check_params(self, x):
         if self.avg is None:
-            self.avg = mdp.numx.zeros(x.shape[1])
+            self.avg = mdp.numx.zeros(x.shape[1], dtype=self.dtype)
 
     def _train(self, x):
         if (self.avg_n is None):
@@ -78,12 +78,16 @@ class MovingTimeDiffNode(mdp.PreserveDimOnlineNode):
 
     def _check_params(self, x):
         if self.x_prev is None:
-            self.x_prev = mdp.numx.zeros(x.shape)
-            self.x_cur = mdp.numx.zeros(x.shape)
+            self.x_prev = mdp.numx.zeros(x.shape, dtype=self.dtype)
+            self.x_cur = mdp.numx.zeros(x.shape, dtype=self.dtype)
 
     def _train(self, x):
         self.x_prev = self.x_cur
         self.x_cur = x[-1:]
+
+    @staticmethod
+    def is_invertible():
+        return False
 
     def _execute(self, x):
         x = mdp.numx.vstack((self.x_prev,x))

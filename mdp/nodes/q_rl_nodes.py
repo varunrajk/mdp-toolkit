@@ -50,21 +50,18 @@ class QRLNode(mdp.RLNode):
 
     def _check_params(self, x):
         if self._theta is None:
-            self._theta = 0.*self.numx_rng.randn(self.observation_dim, self.n_actions)
+            self._theta = mdp.numx.zeros((self.observation_dim, self.n_actions), dtype=self.dtype)
 
     def get_value(self, phi, a=None):
         """Returns q value(s)."""
         if a is not None:
-            if mdp.numx.isscalar(a):
-                return mult(phi, self._theta[:, a])
-            else:
-                return (phi * self._theta[:, a.ravel()].T).sum(axis=1, keepdims=True)
+            return (phi * self._theta[:, a.ravel()].T).sum(axis=1, keepdims=True)
         else:
             return mult(phi, self._theta)
 
     def get_action(self, phi):
         """Returns greedy action(s)."""
-        return self.get_value(phi).argmax(axis=1)[:, None]
+        return self.get_value(phi).argmax(axis=1)[:, None].astype(self.dtype)
 
     def _train(self, *args):
         phi, phi_, a, r, done = args[:5]
@@ -121,7 +118,7 @@ class QLambdaRLNode(QRLNode):
         super(QLambdaRLNode, self)._check_params(x)
 
         if self._e is None:
-            self._e = mdp.numx.zeros([self.observation_dim, self.n_actions])
+            self._e = mdp.numx.zeros([self.observation_dim, self.n_actions], dtype=self.dtype)
 
     def _train(self, *args):
         phi, phi_, a, r, done = args[:5]
@@ -139,7 +136,7 @@ class QLambdaRLNode(QRLNode):
             self._e *= self._gamma * self._lambda
             if done[i]:
                 # reset traces
-                self._e = mdp.numx.zeros([self.observation_dim, self.n_actions])
+                self._e = mdp.numx.zeros([self.observation_dim, self.n_actions], dtype=self.dtype)
 
         self._theta += grad_theta
 

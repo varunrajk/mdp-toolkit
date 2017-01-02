@@ -23,16 +23,12 @@ def test_explorer_nodes():
     assert (out.shape == inp.shape)
 
 
-    inp = mdp.numx.random.randint(0,6,(10000,1))
+    inp = mdp.numx.random.randint(0,6,(10000,1)).astype('float')
     node = EpsilonGreedyDiscreteExplorerNode(n_actions=6, epsilon=0., decay=1.0)
     out = node.execute(inp)
     assert_array_equal(inp, out)
 
     node = EpsilonGreedyDiscreteExplorerNode(n_actions=6, epsilon=1., decay=0.0)
-    out = node.execute(inp)
-    if (inp==out).all():
-        raise Exception("input and output should not be equal.")
-    node.train(inp)
     out = node.execute(inp)
     assert_array_equal(inp, out)
 
@@ -42,10 +38,6 @@ def test_explorer_nodes():
     assert_array_equal(inp, out)
 
     node = EpsilonGreedyContinuousExplorerNode(action_lims=[(-1, 1), (0, 2)], epsilon=1., decay=0.0)
-    out = node.execute(inp)
-    if (inp==out).all():
-        raise Exception("input and output should not be equal.")
-    node.train(inp)
     out = node.execute(inp)
     assert_array_equal(inp, out)
 

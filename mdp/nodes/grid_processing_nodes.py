@@ -52,7 +52,7 @@ class GridProcessingNode(mdp.Node):
     """
 
     def __init__(self, grid_lims, n_grid_pts=None, output_type=None, nbr_dist_fn=1, nbr_radius=1,
-                 include_central_elem=True, input_dim=None, output_dim=None, dtype=None):
+                 include_central_elem=True, input_dim=None, dtype=None):
         """
         grid_lims - a tuple of lower and upper bounds for each dimension of the input grid.
                 Eg., [(lower1, lower2, ...,), (upper1, upper2, ...,)]
@@ -100,10 +100,12 @@ class GridProcessingNode(mdp.Node):
         include_central_elem - Includes distance 0 also as a neighour (that is, the grid point itself)
 
         """
-        super(GridProcessingNode, self).__init__(input_dim, output_dim, dtype)
+        super(GridProcessingNode, self).__init__(input_dim, output_dim=None, dtype=dtype)
         if len(grid_lims) != 2:
             raise mdp.NodeException("'grid_lims' has %d elements given, required 2 "
                                     "[(lower1, lower2, ...,), (upper1, upper2, ...,)]" % (len(grid_lims)))
+        if mdp.numx.isscalar(grid_lims[0]):
+            grid_lims = [tuple((lim,)) for lim in grid_lims]
         if len(grid_lims[0]) != len(grid_lims[1]):
             raise mdp.NodeException("Length of lower_bounds ('grid_lims[0]=%d') does not match the length "
                                     "of the upper_bounds ('grid_lims[1]=%d)." % (len(grid_lims[0]), len(grid_lims[1])))
@@ -111,18 +113,18 @@ class GridProcessingNode(mdp.Node):
 
         if n_grid_pts is None:
             n_grid_pts = [int(self.grid_lims[1][i] - self.grid_lims[0][i] + 1) for i in xrange(len(self.grid_lims[0]))]
-
+        elif mdp.numx.isscalar(n_grid_pts):
+            n_grid_pts = [n_grid_pts] * len(self.grid_lims[0])
         if len(n_grid_pts) != len(self.grid_lims[0]):
             raise mdp.NodeException("Length of 'n_grid_pts' (given = %d) does not match with the "
                                     "number of grid dimensions (%d)." % (len(n_grid_pts), len(self.grid_lims[0])))
-        self.n_grid_pts = mdp.numx.asarray(n_grid_pts)
+        self.n_grid_pts = mdp.numx.asarray(n_grid_pts, dtype='int')
 
         self.nbr_dist_fn = nbr_dist_fn
         self.nbr_radius = nbr_radius
-        self. include_central_elem = include_central_elem
+        self.include_central_elem = include_central_elem
 
         self._output_type = None
-        self._output_dtype = None
         self.output_type = output_type
 
         self._grid = [mdp.numx.linspace(self.grid_lims[0, i], self.grid_lims[1, i], self.n_grid_pts[i], endpoint=True)
@@ -175,13 +177,10 @@ class GridProcessingNode(mdp.Node):
         self._output_type = typ
         if self._output_type == 'gridx':
             self._output_dim = self._input_dim
-            self._output_dtype = 'float'
         elif self._output_type == 'graphx':
             self._output_dim = self._input_dim
-            self._output_dtype = 'int'
         else:
             self._output_dim = 1
-            self._output_dtype = 'int'
 
     # conversion methods
 
@@ -190,26 +189,26 @@ class GridProcessingNode(mdp.Node):
         return x
 
     def _gridx_to_graphx(self, gridx):
-        graphx = mdp.numx.zeros(gridx.shape, dtype='int')
+        graphx = mdp.numx.zeros(gridx.shape)
         for i in xrange(self._graph_dim):
             graphx[:, i] = mdp.numx.argmin(mdp.numx.abs(self._grid[i] - gridx[:, i:i + 1]), axis=1)
         return graphx
 
     def _graphx_to_gridx(self, graphx):
-        gridx = mdp.numx.zeros(graphx.shape, dtype='float')
+        gridx = mdp.numx.zeros(graphx.shape)
         for i in xrange(self._graph_dim):
-            gridx[:, i] = self._grid[i][graphx[:, i]]
+            gridx[:, i] = self._grid[i][graphx[:, i].astype('int')]
         return gridx
 
     def _graphx_to_graphindx(self, graphx):
-        graphindx = mdp.numx.zeros([graphx.shape[0], 1], dtype='int')
+        graphindx = mdp.numx.zeros([graphx.shape[0], 1])
         for i in xrange(self._graph_dim):
             graphindx = graphindx * self.n_grid_pts[i] + graphx[:, i:i + 1]
         return graphindx
 
     def _graphindx_to_graphx(self, graphindx):
         _graphindx = graphindx.copy()
-        graphx = mdp.numx.zeros((graphindx.shape[0], self._graph_dim), 'int')
+        graphx = mdp.numx.zeros((graphindx.shape[0], self._graph_dim))
         for i in xrange(self._graph_dim):
             _d = int(mdp.numx.product(self.n_grid_pts[i + 1:]))
             graphx[:, i:i + 1] = _graphindx / _d
@@ -217,15 +216,15 @@ class GridProcessingNode(mdp.Node):
         return graphx
 
     def _gridx_to_graphindx(self, gridx):
-        graphindx = mdp.numx.zeros([gridx.shape[0], 1], dtype='int')
+        graphindx = mdp.numx.zeros([gridx.shape[0], 1])
         for i in xrange(self._graph_dim):
             graphindx = graphindx * self.n_grid_pts[i] + \
-                        mdp.numx.argmin(mdp.numx.abs(self._grid[i] - gridx[:, i:i+1]), axis=1)[:, None]
+                        mdp.numx.argmin(mdp.numx.absolute(self._grid[i] - gridx[:, i:i+1]), axis=1)[:, None]
         return graphindx
 
     def _graphindx_to_gridx(self, graphindx):
-        _graphindx = graphindx.copy()
-        gridx = mdp.numx.zeros((graphindx.shape[0], self._graph_dim), dtype='float')
+        _graphindx = graphindx.astype('int')
+        gridx = mdp.numx.zeros((graphindx.shape[0], self._graph_dim))
         for i in xrange(self._graph_dim):
             _d = int(mdp.numx.product(self.n_grid_pts[i + 1:]))
             graphx_i = _graphindx / _d
@@ -237,18 +236,14 @@ class GridProcessingNode(mdp.Node):
     def is_trainable():
         return False
 
-    def _get_supported_dtypes(self):
-        return mdp.utils.get_dtypes('AllInteger') + mdp.utils.get_dtypes('Float')
-
     def _train(self, x):
         pass
 
     def _execute(self, x):
-        return self._input_output_fns[('gridx', self.output_type)](x)
+        return self._refcast(self._input_output_fns[('gridx', self.output_type)](x))
 
     def _inverse(self, y):
-        y = mdp.utils.refcast(y, self._output_dtype)
-        return self._input_output_fns[(self.output_type, 'gridx')](y)
+        return self._refcast(self._input_output_fns[(self.output_type, 'gridx')](self._refcast(y)))
 
     # utility methods
     def get_neighbors(self, gridx):

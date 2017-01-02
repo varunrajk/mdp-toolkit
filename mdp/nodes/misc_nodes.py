@@ -19,7 +19,7 @@ if config.has_sklearn:
    from sklearn import preprocessing
 
 
-class NumxBufferNode(mdp.Node):
+class NumxBufferNode(PreserveDimNode):
     def __init__(self, buffer_size, input_dim=None, output_dim=None, dtype=None):
         super(NumxBufferNode, self).__init__(input_dim, output_dim, dtype)
         self._buffer_size = buffer_size
@@ -28,10 +28,10 @@ class NumxBufferNode(mdp.Node):
     def _check_input(self, x):
         super(NumxBufferNode, self)._check_input(x)
         if self._buffer is None:
-            self._buffer = mdp.numx.zeros((self._buffer_size, self.input_dim))
+            self._buffer = mdp.numx.zeros((self._buffer_size, self.input_dim), dtype=self.dtype)
 
     def _get_supported_dtypes(self):
-        return mdp.utils.get_dtypes('AllInteger') + mdp.utils.get_dtypes('Float')
+        return mdp.utils.get_dtypes('Float') + mdp.utils.get_dtypes('AllInteger')
 
     @staticmethod
     def is_trainable():
@@ -436,7 +436,7 @@ class TimeDelaySlidingWindowNode(TimeDelayNode):
     def _execute(self, x):
         assert x.shape[0] == 1
 
-        if self.sliding_wnd == None:
+        if self.sliding_wnd is None:
             self._init_sliding_window()
 
         gap = self.gap
@@ -866,21 +866,25 @@ class TransformerNode(mdp.Node):
     The output data is reshaped back to 2D array.
 
     """
-    def __init__(self, input_shape, transform_seq=None, transform_seq_args=None, input_dim=None, output_dim=None, dtype=None):
+    def __init__(self, input_shape, transform_seq=None, transform_seq_args=None, input_dim=None, dtype=None):
         """
         input_shape - The actual shape of the input
         transform_seq - A list of strings, where each string represents a label for the transformation.
                         Supported transformation:
                             'transpose' - transpose data dimensions
-                            'mean' - remove mean over axis=0
+                            'remove_mean' - remove mean over axis=0
                             'resize' - resize data dims (for image data). Requires OpenCV python bindings.
                             'img_255_1' - scales uint img data to float values between [0,1]
                             'gray' - converts to grayscale images.
+                            'to_2d' - converts data to 2D
+                            'set_shape' - reshapes the data to the given shape. If shape argument is not provided,
+                            then it uses a stored shape buffer, which is either the input_shape or the shape
+                            lost if 'to_2d' is executed.
 
         trasnform_seq_args - A list of required arguments tuples for each transformation, ordered according to
                             the transform_seq.
         """
-        super(TransformerNode, self).__init__(input_dim=input_dim, output_dim=output_dim, dtype=dtype)
+        super(TransformerNode, self).__init__(input_dim=input_dim, output_dim=None, dtype=dtype)
 
         self.input_shape = input_shape
         self._input_dim = mdp.numx.product(self.input_shape)
@@ -891,6 +895,10 @@ class TransformerNode(mdp.Node):
         self.transform_seq_args = transform_seq_args
 
         self._shape_buffer = input_shape
+
+        # infer output_dim (easiest way)
+        dummy_x = mdp.numx_rand.randn(1, mdp.numx.product(self.input_shape))
+        self._output_dim  = self._execute(dummy_x).shape[1]
 
     # properties
 
@@ -970,9 +978,6 @@ class TransformerNode(mdp.Node):
             train_arg_keys = train_arg_keys[:-len(train_arg_spec[3])]
         return train_arg_keys
 
-    def _get_supported_dtypes(self):
-        return mdp.utils.get_dtypes('AllInteger') + mdp.utils.get_dtypes('Float')
-
     # transformation methods
 
     @staticmethod
@@ -994,7 +999,6 @@ class TransformerNode(mdp.Node):
 
     @staticmethod
     def _img_255_1(x):
-        x = x.astype('float')
         x = old_div(x, 255.)
         return x
 
@@ -1039,6 +1043,10 @@ class TransformerNode(mdp.Node):
         x = self._set_shape(x, self.input_shape)
         for i, fn_name in enumerate(self.transform_seq):
             x = self._transform_fns[fn_name](x, *self.transform_seq_args[i])
-        return self._to_2d(x)
+
+        # reset shape buffer
+        self._shape_buffer = self.input_shape
+
+        return self._refcast(self._to_2d(x))
 
 
