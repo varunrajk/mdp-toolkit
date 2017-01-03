@@ -38,7 +38,7 @@ class BasisFunctionNode(mdp.Node):
                         Eg., order 3 of polynomial basis translates x to [1, x, x^2, y, y^2]
                         If False, x -> [1, x, x^2, y, y^2, xy, xy^2, x^2y, x^2y^2].
 
-        basis_params - specific params (list or a dict) required to define the basis.
+        basis_params - Additional (required or optional) params (list or a dict) that define the basis.
 
         scale_out - scale output by a contant. y = basisfn(x)*scale_out
 
@@ -116,11 +116,14 @@ class BasisFunctionNode(mdp.Node):
             self._rbfnode = mdp.nodes.RBFExpansionNode(self._centers, self._sigmas ** 2)
 
         elif self.basis_name is 'lem':
-            req_args = ['adjacency']
+            opt_args = ['adjacency']
+            default_args_str = ['grid_adjacency_matrix']
             self._basis_mode = 'discrete'
             if basis_params is None:
-                raise mdp.NodeException(" %s basis function requires the following 'basis_params' = "
-                                        "%s or a dict of those args." % (basis_name, str(req_args)))
+                print ("\n'%s' basis function also takes optional arguments via \n'basis_params' = "
+                        "%s (as a list or dict). Since the given 'basis_params' in set to None, \ndefault "
+                       "values=%s are used." % (basis_name, str(opt_args), str(default_args_str)))
+                basis_params = [self._gp.get_adjacency_matrix()]
             if isinstance(basis_params, list):
                 self._adj = basis_params[0]
             elif isinstance(basis_params, dict):
@@ -128,7 +131,7 @@ class BasisFunctionNode(mdp.Node):
                     self._adj = basis_params["adjacency"]
                 except KeyError:
                     raise mdp.NodeException(
-                        " Invalid Key! %s basis function requires the following keys %s." % (basis_name, str(req_args)))
+                        " Invalid Key! %s Valid 'basis_params' keys are %s." % (basis_name, str(opt_args)))
             try:
                 from scipy.linalg import eigh
             except ImportError:
@@ -141,21 +144,26 @@ class BasisFunctionNode(mdp.Node):
             self.v = v[mdp.numx.argsort(w)][:, :self._output_dim]
 
         elif self.basis_name is 'gsfa':
-            req_args = ['adjacency', 'degree', 'n_layers', 'n_poly']
+            opt_args = ['adjacency', 'degree', 'n_layers', 'n_poly']
+            default_args_str = ['grid_adjacency_matrix', 3, 3, 4]
             if basis_params is None:
-                raise mdp.NodeException(" %s basis function requires the following 'basis_params' = "
-                                        "%s or a dict of those args." % (basis_name, str(req_args)))
+                if basis_params is None:
+                    print ("\n'%s' basis function also takes optional arguments via \n'basis_params' = "
+                           "%s (as a list or dict). Since the given 'basis_params' in set to None, \ndefault "
+                           "values=%s are used." % (basis_name, str(opt_args), str(default_args_str)))
+                basis_params = [self._gp.get_adjacency_matrix(), 3, 3, 4]
+
             if isinstance(basis_params, list):
                 self._adj, self._degree, self._nlayers, self._npoly = basis_params[:4]
             elif isinstance(basis_params, dict):
                 try:
-                    self._adj = basis_params["adjacency"]
-                    self._degree = basis_params["degree"]
-                    self._nlayers = basis_params["n_layers"]
-                    self._npoly = basis_params["n_poly"]
+                    self._adj = basis_params.get("adjacency", self._gp.get_adjacency_matrix())
+                    self._degree = basis_params.get("degree", 3)
+                    self._nlayers = basis_params.get("n_layers", 3)
+                    self._npoly = basis_params.get("n_poly", 4)
                 except KeyError:
                     raise mdp.NodeException(
-                        " Invalid Key! %s basis function requires the following keys %s." % (basis_name, str(req_args)))
+                        " Invalid Key! %s Valid 'basis_params' keys are %s." % (basis_name, str(opt_args)))
 
             from mdp.nodes import PolynomialExpansionNode
             try:
