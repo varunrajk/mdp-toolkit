@@ -49,6 +49,9 @@ class GridProcessingNode(mdp.Node):
      and the threshold can be specified using the
      'nbr_radius' argument.
 
+     'get_adjacency_matrix' - Returns an adjacency matrix
+     of the graph.
+
     """
 
     def __init__(self, grid_lims, n_grid_pts=None, output_type=None, nbr_dist_fn=1, nbr_radius=1,
@@ -191,7 +194,7 @@ class GridProcessingNode(mdp.Node):
     def _gridx_to_graphx(self, gridx):
         graphx = mdp.numx.zeros(gridx.shape)
         for i in xrange(self._graph_dim):
-            graphx[:, i] = mdp.numx.argmin(mdp.numx.abs(self._grid[i] - gridx[:, i:i + 1]), axis=1)
+            graphx[:, i] = mdp.numx.argmin(mdp.numx.absolute(self._grid[i] - gridx[:, i:i + 1]), axis=1)
         return graphx
 
     def _graphx_to_gridx(self, graphx):
@@ -207,7 +210,7 @@ class GridProcessingNode(mdp.Node):
         return graphindx
 
     def _graphindx_to_graphx(self, graphindx):
-        _graphindx = graphindx.copy()
+        _graphindx = graphindx.astype('int')
         graphx = mdp.numx.zeros((graphindx.shape[0], self._graph_dim))
         for i in xrange(self._graph_dim):
             _d = int(mdp.numx.product(self.n_grid_pts[i + 1:]))
@@ -248,3 +251,13 @@ class GridProcessingNode(mdp.Node):
     # utility methods
     def get_neighbors(self, gridx):
         return self._graphx_to_gridx(self._get_graph_neighbors(self._gridx_to_graphx(gridx)))
+
+    def get_adjacency_matrix(self):
+        A = mdp.numx.zeros([self._tot_graph_nodes, self._tot_graph_nodes])
+        for i in xrange(A.shape[0]):
+            i_arr = mdp.numx.array([[i]]).astype('float')
+            for j in self._graphx_to_graphindx(self._get_graph_neighbors(self._graphindx_to_graphx(i_arr))):
+                A[i, int(j)] = 1
+        return self._refcast(A)
+
+
