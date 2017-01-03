@@ -2,7 +2,7 @@ import mdp
 from difflib import SequenceMatcher
 import gym
 from gym import spaces
-
+import time
 
 class GymNode(mdp.OnlineNode):
     """GymNode is a thin OnlineNode wrapper over OpenAi's Gym library.
@@ -47,7 +47,7 @@ class GymNode(mdp.OnlineNode):
 
     """
 
-    def __init__(self, env_name, render=False, auto_reset=True, dtype=None, numx_rng=None):
+    def __init__(self, env_name, render=False, render_interval=1, auto_reset=True, dtype=None, numx_rng=None):
         """
         env_name - Registered gym environment name. Eg. "MountainCar-v0"
         render - Enable or disable rendering. Disabled by default.
@@ -107,6 +107,12 @@ class GymNode(mdp.OnlineNode):
         # get observation
         self._phi = mdp.numx.reshape(self.env.reset(), [1, self.observation_dim])
 
+
+        self.render_interval = render_interval
+        self._interval = 1 if self.render_interval == -1 else self.render_interval
+        self._flow_time = 0
+        self._tlen = 0
+
         # cache to store variables
         self._cache = {'info': None}
 
@@ -143,8 +149,21 @@ class GymNode(mdp.OnlineNode):
             if self.action_type == 'discrete':
                 a = int(mdp.numx.asscalar(a))
             phi, r, done, info = self.env.step(a)
+
             if self.render:
-                self.env.render()
+                self._tlen += 1
+                _flow_dur = time.time() - self._flow_time
+                y = x
+                if self._tlen % int(self._interval) == 0:
+                    t = time.time()
+                    self.env.render()
+                    _plot_dur = time.time() - t
+                    if self.render_interval == -1:
+                        self._interval *=  (100 * _plot_dur / _flow_dur + (self._tlen / self._interval - 1) *
+                                            self._interval) / float(self._tlen)
+                        self._interval = mdp.numx.clip(self._interval, 1, 50)
+                self._flow_time = time.time()
+
             if self.auto_reset and done:
                 self.env.reset()
             yield phi, r, done, info
