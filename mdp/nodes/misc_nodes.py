@@ -877,6 +877,7 @@ class TransformerNode(mdp.Node):
                             'img_255_1' - scales uint img data to float values between [0,1]
                             'gray' - converts to grayscale images.
                             'to_2d' - converts data to 2D
+                            'to_dtype' - converts data to the desired data type
                             'set_shape' - reshapes the data to the given shape. If shape argument is not provided,
                             then it uses a stored shape buffer, which is either the input_shape or the shape
                             lost if 'to_2d' is executed.
@@ -956,7 +957,7 @@ class TransformerNode(mdp.Node):
 
     def _get_transform_fns(self):
         d = {'transpose': self._transpose, 'remove_mean': self._remove_mean, 'resize': self._resize, 'img_255_1': self._img_255_1,
-         'gray': self._gray, 'to_2d': self._to_2d, 'set_shape': self._set_shape}
+         'gray': self._gray, 'to_2d': self._to_2d, 'set_shape': self._set_shape, 'to_dtype': self._to_dtype}
 
         if config.has_sklearn:
             _skd = {_key: getattr(preprocessing, _key) for _key in filter(lambda a: a[0].islower(), preprocessing.__all__)}
@@ -989,13 +990,44 @@ class TransformerNode(mdp.Node):
         return x - x.mean(axis=0)
 
     def _resize(self, x, size_xy):
+        cvflag = True
+        pilflag = True
         try:
+            import cv2
+        except ImportError:
+            cvflag = False
+        try:
+            import PIL.Image
+        except ImportError:
+            pilflag = False
+
+        if cvflag:
             from cv2 import resize
             rimg = [(resize(_x, size_xy[::-1])) for _x in x]
-            rimg = mdp.numx.asarray(rimg)
-        except ImportError:
-            raise mdp.NodeException("OpenCV python bindings were not found. Install OpenCV to resize images.")
-        return rimg
+        if pilflag:
+            from PIL.Image import fromarray
+            rimg = []
+            for _x in x:
+                if _x.dtype in ['uint64', 'int64', 'float64', 'complex64', 'complex128']:
+                    raise mdp.NodeException("Unsupported dtype for resize. Use 'to_dtype' transformation method"
+                                            "to convert to a dtype <=32 bit before 'resize'.")
+                if len(_x.shape) == 3:
+                    if _x.dtype in ['uint8', 'int8']:
+                        imx = fromarray(_x, 'RGB')
+                    else:
+                        raise mdp.NodeException("Unsupported dtype for resize. Use 'to_dtype' transformation method"
+                                                "to convert to a dtype ('uint8' or 'int8') before 'resize'.")
+                elif _x.dtype in ['uint8', 'int8']:
+                    imx = fromarray(_x, 'L')
+                elif _x.dtype in mdp.utils.get_dtypes('UnsignedInteger') + mdp.utils.get_dtypes('Integer'):
+                    imx = fromarray(_x, 'I')
+                else:
+                    imx = fromarray(_x, 'F')
+                rimg.append(mdp.numx.array(imx.resize(size_xy[::-1])))
+        else:
+            raise mdp.NodeException("OpenCV python bindings or PIL Image package is required to resize images.")
+
+        return mdp.numx.asarray(rimg)
 
     @staticmethod
     def _img_255_1(x):
@@ -1012,13 +1044,17 @@ class TransformerNode(mdp.Node):
         self._shape_buffer = x.shape[1:]
         return x.reshape(x.shape[0], mdp.numx.product(x.shape[1:]))
 
+    @staticmethod
+    def _to_dtype(x, dtype):
+        return x.astype(dtype)
+
     def _set_shape(self, x, shape=None):
         if shape is None:
             # check if it can be reshapes with the stored shape buffer
             if mdp.numx.product(self._shape_buffer) == mdp.numx.product(x.shape[1:]):
                 return x.reshape(x.shape[0], *self._shape_buffer)
             else:
-                raise mdp.NodeException("Cannot reshape to the store shape buffer. Provide the desired shape.")
+                raise mdp.NodeException("Cannot reshape to the stored shape buffer. Provide the desired shape.")
         else:
             return x.reshape(x.shape[0], *shape)
 
