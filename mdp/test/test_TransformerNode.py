@@ -2,11 +2,9 @@
 from _tools import *
 from mdp.nodes import TransformerNode
 
-
 def test_transformer_node():
-    from scipy.misc import face
 
-    inp = face()[None, :]
+    inp = mdp.numx_rand.randint(0,255,(1,768,1024,3)).astype('uint8')
     inp = mdp.numx.vstack((inp, inp))
     inp_shape = inp.shape[1:]
     inp = inp.reshape(2, 768*1024*3).astype('float')
