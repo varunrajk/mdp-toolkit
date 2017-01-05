@@ -6,8 +6,58 @@ import mdp
 
 
 class HSFANode(mdp.Node):
+    """Extract slowly varying components via hierarchical
+    processing from input data. The network uses weight sharing for
+    each layer over multiple locally connected receptive fields.
+
+    More information about Hierarchical Slow Feature Analysis can be found in
+    Wiskott, L. and Sejnowski, T.J., Slow Feature Analysis: Unsupervised
+    Learning of Invariances, Neural Computation, 14(4):715-770 (2002).
+
+    HSFANode also supports random sampling of data-cuboids via a RandomSwitchboard
+    instead of the fixed RectangularSwitchboard.
+
+    HSFANode also implements most of the 'list' container methods; such as insert,
+    add, delete layers from the network.
+
+    The node also provides a 'show_flow' utility method to visualize the
+    network.
+
+    """
+
     def __init__(self, in_channels_xy, field_channels_xy, field_spacing_xy, n_features, in_channel_dim=1,
                  n_training_fields=None, field_dstr='uniform', output_2d=True, dtype=None):
+        """
+        in_channels_xy - (width, height) of the input image
+        field_channels_xy - A list of field_channel_xy tuples for each layer
+                            [(field_width_layer-0, field_height_layer-0), (field_width_layer-1, field_height_layer-1),
+                            ..., ]
+                            For a fully connected terminal layer use (-1,-1) for the last layer.
+                            Number of tuples must match the intended number of layers in the network.
+
+        field_spacing_xy - A list of field_spacing_xy tuples for each layer.
+                           Also accepts a single xy tuple replicated for all the layers.
+                           For a fully connected terminal layer use (-1,-1) for the last layer.
+                           This
+        n_features - number of slow features for each layer.
+                     Accepted values:
+                     scalar - Only SFA with the specified value as output dim is used for each layer
+                     2-tuple - Output_dims of SFA-SFA2 for each layer
+                     list of scalars or 2-tuples - Individual values for each layer. Number of elements must be equal
+                                                    to the number of layers.
+        in_channel_dim - input channel dimension. Eg. RGB image - 3, grayscale - 1.
+        n_training_fields - If None (default), the network receives training data through the evenly placed
+                            receptive fields for each layer via a Rectangular2DSwitchboard.
+                            If a list of scalars is provided - the network samples training data for each layer
+                            from randomly placed receptive fields. The placement is randomized for each batch
+                            of data. However, data upon execution is still propagated through the evenly placed
+                            receptive fields.
+                            If set to -1, the network auto sets the number of training fields for each layer.
+
+        field_dstr - The type of distribution to use for random sampling. Currently only supports 'uniform'
+
+        output_2d - If False, the output_data dimensions are not flattened.
+        """
         super(HSFANode, self).__init__(input_dim=None, output_dim=None, dtype=dtype)
 
         self.field_channels_xy = field_channels_xy
