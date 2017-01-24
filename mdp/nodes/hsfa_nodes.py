@@ -46,13 +46,20 @@ class HSFANode(mdp.Node):
                      list of scalars or 2-tuples - Individual values for each layer. Number of elements must be equal
                                                     to the number of layers.
         in_channel_dim - input channel dimension. Eg. RGB image - 3, grayscale - 1.
-        n_training_fields - If None (default), the network receives training data through the evenly placed
+        n_training_fields - The network samples training data for each layer from randomly placed
+                            "n_training_fields[i]" receptive fields. The placement is randomized for each batch
+                            of data. However, data upon execution is propagated through the regular
+                            Rectangular2DSwitchboard.
+                            Accepted values:
+                            If None (default), the network receives training data through the evenly placed
                             receptive fields for each layer via a Rectangular2DSwitchboard.
-                            If a list of scalars is provided - the network samples training data for each layer
-                            from randomly placed receptive fields. The placement is randomized for each batch
-                            of data. However, data upon execution is still propagated through the evenly placed
-                            receptive fields.
-                            If set to -1, the network auto sets the number of training fields for each layer.
+                            If set to -1, the network sets the number of training fields for each layer equal to the
+                            output_channels of the Rectangular2DSwitchboard.
+                            if set to a value in (0,1), the network sets the number of training fields equal to
+                            the percentage of the output_channels of the Rectangular2DSwitchboard.
+                            If a list of scalars is given - if the scalar is -1 or is in (0, 1), then the
+                            corresponding value is changed according the rules discussed above. If a value >= 1 is
+                            used, then the value is taken as it is.
 
         field_dstr - The type of distribution to use for random sampling. Currently only supports 'uniform'
 
@@ -78,10 +85,19 @@ class HSFANode(mdp.Node):
             self.n_training_fields = n_training_fields
         else:
             # Random sampling enabled
-            if n_training_fields == -1:
-                # Automatically set n_training_fields to double the minimum recommended.
-                # n_training_fields = [2*i for i in self._rec_n_training_fields]
-                n_training_fields = self._rec_n_training_fields
+            if mdp.numx.isscalar(n_training_fields):
+                n_training_fields = [n_training_fields] * self.n_layers
+
+            if isinstance(n_training_fields, list):
+                for _i, _n in enumerate(n_training_fields):
+                    if _n == -1:
+                        # Automatically set n_training_field equal to the number used in rectangular switchboard.
+                        n_training_fields[_i] = self._rec_n_training_fields[_i]
+                    elif (0 < _n) and (_n < 1):
+                        # set n_training_field equal to the given percentage of the number used
+                        # in rectangular switchboard.
+                        n_training_fields[_i] = int(mdp.numx.ceil(_n * self._rec_n_training_fields[_i]))
+
             self.n_training_fields = self._x_to_layersx(n_training_fields, 'n_training_fields')
             self._check_n_training_fields()
             self._training_flow = self._init_random_sampling_net()  # not an mdp.Flow
@@ -185,9 +201,10 @@ class HSFANode(mdp.Node):
 
     def _check_n_training_fields(self):
         for i in xrange(len(self._rec_n_training_fields)):
-            if self.n_training_fields[i] < self._rec_n_training_fields[i]:
-                _warnings.warn("\nRecommended n_training_field for layer "
-                               "%d is %d, %d given." % (i, self._rec_n_training_fields[i], self.n_training_fields[i]))
+            if self.n_training_fields[i] > self._rec_n_training_fields[i]:
+                _warnings.warn("\nNumber of training fields (n_training_fields) for layer "
+                               "%d (%d) exceeds the training_fields of a regular rectangular grid (%d)." %
+                               (i, self.n_training_fields[i], self._rec_n_training_fields[i]))
 
     def _x_to_layersx(self, x, xname):
         """
