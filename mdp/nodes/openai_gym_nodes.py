@@ -4,6 +4,7 @@ import gym
 from gym import spaces
 import time
 
+
 class GymNode(mdp.OnlineNode):
     """GymNode is a thin OnlineNode wrapper over OpenAi's Gym library.
     For more information about the Gym library refer to the
@@ -51,6 +52,7 @@ class GymNode(mdp.OnlineNode):
         """
         env_name - Registered gym environment name. Eg. "MountainCar-v0"
         render - Enable or disable rendering. Disabled by default.
+        render_interval - Number of execution steps delay between rendering
         auto_reset - Automatically resets the environment if gym env's done is True.
         """
         super(GymNode, self).__init__(input_dim=None, output_dim=None, dtype=dtype, numx_rng=None)
@@ -107,7 +109,6 @@ class GymNode(mdp.OnlineNode):
         # get observation
         self._phi = mdp.numx.reshape(self.env.reset(), [1, self.observation_dim])
 
-
         self.render_interval = render_interval
         self._interval = 1 if self.render_interval == -1 else self.render_interval
         self._flow_time = 0
@@ -143,38 +144,38 @@ class GymNode(mdp.OnlineNode):
     def is_invertible():
         return False
 
+    def _render_step(self):
+        if self.render:
+            self._tlen += 1
+            _flow_dur = time.time() - self._flow_time
+            if self._tlen % int(self._interval) == 0:
+                t = time.time()
+                self.env.render()
+                _plot_dur = time.time() - t
+                if self.render_interval == -1:
+                    self._interval *= (100 * _plot_dur / _flow_dur + (self._tlen / self._interval - 1) *
+                                       self._interval) / float(self._tlen)
+                    self._interval = mdp.numx.clip(self._interval, 1, 50)
+            self._flow_time = time.time()
+
     # environment steps
-    def __steps(self, x):
+    def _steps(self, x):
         for a in x:
             if self.action_type == 'discrete':
                 a = int(mdp.numx.asscalar(a))
             phi, r, done, info = self.env.step(a)
-
-            if self.render:
-                self._tlen += 1
-                _flow_dur = time.time() - self._flow_time
-                y = x
-                if self._tlen % int(self._interval) == 0:
-                    t = time.time()
-                    self.env.render()
-                    _plot_dur = time.time() - t
-                    if self.render_interval == -1:
-                        self._interval *=  (100 * _plot_dur / _flow_dur + (self._tlen / self._interval - 1) *
-                                            self._interval) / float(self._tlen)
-                        self._interval = mdp.numx.clip(self._interval, 1, 50)
-                self._flow_time = time.time()
-
+            self._render_step()
             if self.auto_reset and done:
                 self.env.reset()
-            yield phi, r, done, info
+            yield phi, a, r, done, info
 
     def _execute(self, x):
-        phi_, r, done, info = zip(*self.__steps(x))
+        phi_, a, r, done, info = zip(*self._steps(x))
         phi_ = mdp.numx.reshape(phi_, [len(phi_), self.observation_dim])
         phi = mdp.numx.vstack((self._phi, phi_[:-1]))
         self._phi = phi_[-1:]
+        a = mdp.numx.reshape(a, [len(a), self.action_dim])
         r = mdp.numx.reshape(r, [len(r), 1])
-        a = x
         done = mdp.numx.reshape(done, [len(done), 1])
         y = mdp.numx.hstack((phi, phi_, a, r, done))
         self.cache['info'] = info[-1]
