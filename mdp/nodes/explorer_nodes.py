@@ -62,6 +62,93 @@ class DiscreteExplorerNode(mdp.OnlineNode):
             return mdp.numx.array([[self._roulette_wheel(prob_vec[i])] for i in xrange(x.shape[0])], dtype=self.dtype)
 
 
+class EpsilonGreedyDiscreteExplorerNode(DiscreteExplorerNode):
+    """
+    EpsilonGreedyDiscreteExplorerNode is an online explorer node for reinforcement
+    learning that switches between exploration (random action) and exploitation (given action)
+    modes based on the current value of a decaying epsilon parameter (0<epsilon<1).
+
+    The node returns a random action with a probability of epsilon and the given action
+    with the probability of (1-epsilon)
+
+    The train function of this node only updates the epsilon parameter. The execute function
+    returns a discrete action. Optionally, one can also provide a probability vector to
+    specify a probability distribution when sampling actions at random.
+
+    For more information on epsilon greedy approach refer
+    Sutton, Richard S., and Andrew G. Barto. Reinforcement learning:
+    An introduction. Vol. 1. No. 1. Cambridge: MIT press, 1998.
+
+    """
+
+    def __init__(self, n_actions, epsilon=1., decay=0.999, prob_vec=None, dtype=None, numx_rng=None):
+        """
+        epsilon - Parameter that balances exploration vs exploitation.
+        decay - Decay constant of epsilon. Epsilon decays exponentially.
+        """
+        super(EpsilonGreedyDiscreteExplorerNode, self).__init__(n_actions=n_actions, prob_vec=prob_vec,
+                                                                input_dim=None, dtype=dtype, numx_rng=numx_rng)
+        self.epsilon = epsilon
+        self.decay = decay
+        self._input_dim = self._output_dim
+
+    def _train(self, x):
+        self.epsilon *= self.decay ** x.shape[0]
+
+    def _execute(self, x, prob_vec=None):
+        f = (self.numx_rng.rand(x.shape[0], 1) < self.epsilon)
+        out = f * super(EpsilonGreedyDiscreteExplorerNode, self)._execute(x, prob_vec) + (1. - f) * x
+        return self._refcast(out)
+
+
+
+class BoltzmannDiscreteExplorerNode(DiscreteExplorerNode):
+    """
+    BoltzmannDiscreteExplorerNode is an online explorer node for reinforcement
+    learning that balances exploration (random action) and exploitation (optimal action)
+    modes based on a decaying temperature parameter.
+
+    The train function of this node only updates the temperature parameter.
+    The input to the node is a action/state value-vector for each action, the output is a softmax-function
+    output weighted by the temperature parameter.
+
+    For more information on epsilon greedy approach refer
+    Sutton, Richard S., and Andrew G. Barto. Reinforcement learning:
+    An introduction. Vol. 1. No. 1. Cambridge: MIT press, 1998.
+
+    """
+
+    def __init__(self, n_actions, temperature=50., decay=0.999, dtype=None, numx_rng=None):
+        """
+        temperature - Parameter that balances exploration vs exploitation.
+        decay - Decay constant of epsilon. Epsilon decays exponentially.
+        """
+        super(BoltzmannDiscreteExplorerNode, self).__init__(n_actions=n_actions, prob_vec=None, input_dim=None,
+                                                            dtype=dtype, numx_rng=numx_rng)
+        self.temperature = temperature
+        self.decay = float(decay)
+
+        # input 'x' must be a vector of action or state values for each action.
+        self._input_dim = n_actions
+        self._output_dim = 1
+
+    def _train(self, x):
+        self.temperature *= self.decay ** x.shape[0]
+
+    def _execute(self, x, prob_vec=None):
+        e = mdp.numx.e
+        if self.temperature < 0.01:
+            return self._refcast(mdp.numx.argmax(x, axis=1)[:, None])
+        else:
+            _p = x / self.temperature
+            prob_vec = mdp.numx.power(e, _p) / mdp.numx.sum(mdp.numx.power(e, _p), axis=1, keepdims=True)
+            return super(BoltzmannDiscreteExplorerNode, self)._execute(self._refcast(x), prob_vec=prob_vec)
+
+###############################################################################################################
+###############################################################################################################
+###############################################################################################################
+
+
 class ContinuousExplorerNode(mdp.OnlineNode):
     """
     ContinuousExplorerNode is an online explorer node for reinforcement
@@ -139,43 +226,6 @@ class ContinuousExplorerNode(mdp.OnlineNode):
         return self._dstr_fn(self.action_lims[0], self.action_lims[1], [x.shape[0], self.output_dim]).astype(self.dtype)
 
 
-class EpsilonGreedyDiscreteExplorerNode(DiscreteExplorerNode):
-    """
-    EpsilonGreedyDiscreteExplorerNode is an online explorer node for reinforcement
-    learning that switches between exploration (random action) and exploitation (given action)
-    modes based on the current value of a decaying epsilon parameter (0<epsilon<1).
-
-    The node returns a random action with a probability of epsilon and the given action
-    with the probability of (1-epsilon)
-
-    The train function of this node only updates the epsilon parameter. The execute function
-    returns a discrete action. Optionally, one can also provide a probability vector to
-    specify a probability distribution when sampling actions at random.
-
-    For more information on epsilon greedy approach refer
-    Sutton, Richard S., and Andrew G. Barto. Reinforcement learning:
-    An introduction. Vol. 1. No. 1. Cambridge: MIT press, 1998.
-
-    """
-
-    def __init__(self, n_actions, epsilon=1., decay=0.999, prob_vec=None, dtype=None, numx_rng=None):
-        """
-        epsilon - Parameter that balances exploration vs exploitation.
-        decay - Decay constant of epsilon. Epsilon decays exponentially.
-        """
-        super(EpsilonGreedyDiscreteExplorerNode, self).__init__(n_actions=n_actions, prob_vec=prob_vec,
-                                                                input_dim=None, dtype=dtype, numx_rng=numx_rng)
-        self.epsilon = epsilon
-        self.decay = decay
-        self._input_dim = self._output_dim
-
-    def _train(self, x):
-        self.epsilon *= self.decay ** x.shape[0]
-
-    def _execute(self, x, prob_vec=None):
-        f = (self.numx_rng.rand(x.shape[0], 1) < self.epsilon)
-        out = f * super(EpsilonGreedyDiscreteExplorerNode, self)._execute(x, prob_vec) + (1. - f) * x
-        return self._refcast(out)
 
 class EpsilonGreedyContinuousExplorerNode(ContinuousExplorerNode):
     """
@@ -217,49 +267,6 @@ class EpsilonGreedyContinuousExplorerNode(ContinuousExplorerNode):
         return self._refcast(out)
 
 
-class BoltzmannDiscreteExplorerNode(DiscreteExplorerNode):
-    """
-    BoltzmannDiscreteExplorerNode is an online explorer node for reinforcement
-    learning that balances exploration (random action) and exploitation (optimal action)
-    modes based on a decaying temperature parameter.
-
-    The train function of this node only updates the temperature parameter.
-    The input to the node is a action/state value-vector for each action, the output is a softmax-function
-    output weighted by the temperature parameter.
-
-    For more information on epsilon greedy approach refer
-    Sutton, Richard S., and Andrew G. Barto. Reinforcement learning:
-    An introduction. Vol. 1. No. 1. Cambridge: MIT press, 1998.
-
-    """
-
-    def __init__(self, n_actions, temperature=50., decay=0.999, dtype=None, numx_rng=None):
-        """
-        temperature - Parameter that balances exploration vs exploitation.
-        decay - Decay constant of epsilon. Epsilon decays exponentially.
-        """
-        super(BoltzmannDiscreteExplorerNode, self).__init__(n_actions=n_actions, prob_vec=None, input_dim=None,
-                                                            dtype=dtype, numx_rng=numx_rng)
-        self.temperature = temperature
-        self.decay = float(decay)
-
-        # input 'x' must be a vector of action or state values for each action.
-        self._input_dim = n_actions
-        self._output_dim = 1
-
-    def _train(self, x):
-        self.temperature *= self.decay ** x.shape[0]
-
-    def _execute(self, x, prob_vec=None):
-        e = mdp.numx.e
-        if self.temperature < 0.01:
-            return self._refcast(mdp.numx.argmax(x, axis=1)[:, None])
-        else:
-            _p = x / self.temperature
-            prob_vec = mdp.numx.power(e, _p) / mdp.numx.sum(mdp.numx.power(e, _p), axis=1, keepdims=True)
-            return super(BoltzmannDiscreteExplorerNode, self)._execute(self._refcast(x), prob_vec=prob_vec)
-
-
 class GaussianContinuousExplorereNode(ContinuousExplorerNode):
     """
     GaussianContinuousExplorerNode is an online explorer node for reinforcement
@@ -276,7 +283,7 @@ class GaussianContinuousExplorereNode(ContinuousExplorerNode):
 
     """
 
-    def __init__(self, action_lims, sigma=None, decay=0.999, momentum=0., dstr_fn=None, dtype=None,
+    def __init__(self, action_lims, sigma=None, decay=0.999, dstr_fn=None, dtype=None,
                  numx_rng=None):
         """
         epsilon - Parameter that balances exploration vs exploitation.
