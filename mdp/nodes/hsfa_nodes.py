@@ -26,7 +26,7 @@ class HSFANode(mdp.Node):
     """
 
     def __init__(self, in_channels_xy, field_channels_xy, field_spacing_xy, n_features, in_channel_dim=1,
-                 n_training_fields=None, field_dstr='uniform', output_2d=True, dtype=None):
+                 n_training_fields=None, field_dstr='uniform', output_dim=None, dtype=None):
         """
         in_channels_xy - (width, height) of the input image
         field_channels_xy - A list of field_channel_xy tuples for each layer
@@ -63,7 +63,6 @@ class HSFANode(mdp.Node):
 
         field_dstr - The type of distribution to use for random sampling. Currently only supports 'uniform'
 
-        output_2d - If False, the output_data dimensions are not flattened.
         """
         super(HSFANode, self).__init__(input_dim=None, output_dim=None, dtype=dtype)
 
@@ -71,7 +70,6 @@ class HSFANode(mdp.Node):
         self.in_channels_xy = in_channels_xy
         self.in_channel_dim = in_channel_dim
         self.field_dstr = field_dstr
-        self.output_2d = output_2d
 
         self.n_layers = len(field_channels_xy)
         self.field_spacing_xy = self._xy_to_layersxy(field_spacing_xy, 'field_spacing_xy')
@@ -104,10 +102,7 @@ class HSFANode(mdp.Node):
             self._execution_flow = mdp.Flow(self._default_net)
 
         self._input_dim = mdp.numx.prod(self.input_shape)
-        if self.output_2d:
-            self._output_dim = mdp.numx.prod(self.output_shape)
-        else:
-            self._output_dim = self.output_shape
+        self._set_output_dim(output_dim)
 
     def _init_default_net(self):
         if self.field_channels_xy[0] == (-1, -1):
@@ -294,6 +289,13 @@ class HSFANode(mdp.Node):
     def is_invertible():
         return False
 
+    def _set_output_dim(self, n):
+        self._output_dim = min(mdp.numx.prod(self.output_shape), n)
+
+    def _check_train_args(self, x, *args, **kwargs):
+        if self.output_dim is None:
+            self._output_dim = mdp.numx.prod(self.output_shape)
+
     def _get_train_seq(self):
         """Return a training sequence containing all training phases."""
 
@@ -317,7 +319,7 @@ class HSFANode(mdp.Node):
         return train_seq
 
     def _execute(self, x, n=None):
-        return self._execution_flow.execute(x, nodenr=n)
+        return self._execution_flow.execute(x, nodenr=n)[:, :self.output_dim]
 
     # string representation
 
@@ -358,9 +360,10 @@ class HSFANode(mdp.Node):
         in_channel_dim = "in_channel_dim=%s" % str(self.in_channel_dim)
         n_training_fields = "n_training_fields=%s" % str(self.n_training_fields)
         field_dstr = "field_dstr='%s'" % str(self.field_dstr)
-        output_2d = "output_2d=%s" % str(self.output_2d)
+        output_dim = "output_dim=%s" % str(self.output_dim)
+        dtype = "dtype=%s" % str(self.dtype)
         args = ', '.join((in_channels_xy, field_channels_xy, field_spacing_xy, n_features, in_channel_dim,
-                          n_training_fields, field_dstr, output_2d))
+                          n_training_fields, field_dstr, output_dim, dtype))
         return name + '(' + args + ')'
 
     # html representation
@@ -490,7 +493,7 @@ class HSFANode(mdp.Node):
 class HSFAPoolNode(HSFANode):
     def __init__(self, in_channels_xy, field_channels_xy, field_spacing_xy, n_features, pool_channels_xy,
                  in_channel_dim=1, pool_spacing_xy=None, pool_mode='max', n_training_fields=None, field_dstr='uniform',
-                 output_2d=True, dtype=None):
+                 output_dim=None, dtype=None):
         self.n_layers = len(field_channels_xy)
         self.pool_mode = pool_mode
         self.pool_channels_xy = self._xy_to_layersxy(pool_channels_xy, 'pool_channels_xy')
@@ -498,7 +501,7 @@ class HSFAPoolNode(HSFANode):
         super(HSFAPoolNode, self).__init__(in_channels_xy, field_channels_xy, field_spacing_xy, n_features,
                                            in_channel_dim=in_channel_dim,
                                            n_training_fields=n_training_fields, field_dstr=field_dstr,
-                                           output_2d=output_2d, dtype=dtype)
+                                           output_dim=output_dim, dtype=dtype)
 
     def _init_default_net(self):
         if self.field_channels_xy[0] == (-1, -1):
@@ -616,7 +619,8 @@ class HSFAPoolNode(HSFANode):
         pool_mode = "pool_mode='%s'" % str(self.pool_mode)
         n_training_fields = "n_training_fields=%s" % str(self.n_training_fields)
         field_dstr = "field_dstr='%s'" % str(self.field_dstr)
-        output_2d = "output_2d=%s" % str(self.output_2d)
+        output_dim = "output_dim=%s" % str(self.output_dim)
+        dtype = "dtype=%s" % str(self.dtype)
         args = ', '.join((in_channels_xy, field_channels_xy, field_spacing_xy, n_features, pool_channels_xy,
-                          in_channel_dim, pool_spacing_xy, pool_mode, n_training_fields, field_dstr, output_2d))
+                          in_channel_dim, pool_spacing_xy, pool_mode, n_training_fields, field_dstr, output_dim, dtype))
         return name + '(' + args + ')'
