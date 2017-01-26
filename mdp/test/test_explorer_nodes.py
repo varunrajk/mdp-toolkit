@@ -18,7 +18,7 @@ def test_explorer_nodes():
     out = node.execute(inp)
     assert (out.shape == inp.shape)
 
-    node = ContinuousExplorerNode(action_lims=[(-1, 1), (0, 2)], momentum=0.4)
+    node = ContinuousExplorerNode(action_lims=[(-1, 1), (0, 2)])
     out = node.execute(inp)
     assert (out.shape == inp.shape)
 

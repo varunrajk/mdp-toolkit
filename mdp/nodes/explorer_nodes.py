@@ -75,10 +75,9 @@ class ContinuousExplorerNode(mdp.OnlineNode):
 
     """
 
-    def __init__(self, action_lims, momentum=0., dstr_fn=None, input_dim=None, dtype=None, numx_rng=None):
+    def __init__(self, action_lims, dstr_fn=None, input_dim=None, dtype=None, numx_rng=None):
         """
         action_lims - Lower and upper bounds for all action dimensions. Eg. [(min1, min2, ...,), (max1, max2, ...,)]
-        momentum - Momemtum parameter (mass) for selecting actions.
         dstr_fn - A funtion that returns a real number given the min bound and max bound.
                     Eg. dstr_fn(action_lims[0], action_lims[1], shape) -> array, where mini <= array_elem_i < maxi.
         """
@@ -94,7 +93,6 @@ class ContinuousExplorerNode(mdp.OnlineNode):
             raise mdp.NodeException("Length of lower_bounds ('action_lims[0]=%d') does not match the length "
                                     "of the upper_bounds ('action_lims[1]=%d)." % (len(action_lims[0]), len(action_lims[1])))
         self.action_lims = mdp.numx.asarray(action_lims)
-        self._m = momentum
         self._dstr_fn = dstr_fn
         self._action = None
 
@@ -138,17 +136,7 @@ class ContinuousExplorerNode(mdp.OnlineNode):
         pass
 
     def _execute(self, x):
-        if self._m == 0:
-            return self._dstr_fn(self.action_lims[0], self.action_lims[1],
-                                 [x.shape[0], self.output_dim]).astype(self.dtype)
-        else:
-            action = mdp.numx.zeros((x.shape[0] + 1, self.output_dim))
-            action[0] = self._action
-            for i in xrange(x.shape[0]):
-                new_action = self.dstr_fn(self.action_lims[0], self.action_lims[1], [1, self.output_dim])
-                action[i + 1] = self._m * action[i] + (1 - self._m) * new_action
-            self._action = action[-1]
-            return self._refcast(action[1:])
+        return self._dstr_fn(self.action_lims[0], self.action_lims[1], [x.shape[0], self.output_dim]).astype(self.dtype)
 
 
 class EpsilonGreedyDiscreteExplorerNode(DiscreteExplorerNode):
@@ -208,12 +196,12 @@ class EpsilonGreedyContinuousExplorerNode(ContinuousExplorerNode):
 
     """
 
-    def __init__(self, action_lims, epsilon=1., decay=0.999, momentum=0., dstr_fn=None, dtype=None, numx_rng=None):
+    def __init__(self, action_lims, epsilon=1., decay=0.999, dstr_fn=None, dtype=None, numx_rng=None):
         """
         epsilon - Parameter that balances exploration vs exploitation.
         decay - Decay constant of epsilon. Epsilon decays exponentially.
         """
-        super(EpsilonGreedyContinuousExplorerNode, self).__init__(action_lims, momentum=momentum, dstr_fn=dstr_fn,
+        super(EpsilonGreedyContinuousExplorerNode, self).__init__(action_lims, dstr_fn=dstr_fn,
                                                                   dtype=dtype, numx_rng=numx_rng)
 
         self.epsilon = epsilon
@@ -294,8 +282,8 @@ class GaussianContinuousExplorereNode(ContinuousExplorerNode):
         epsilon - Parameter that balances exploration vs exploitation.
         decay - Decay constant of epsilon. Epsilon decays exponentially.
         """
-        super(GaussianContinuousExplorereNode, self).__init__(action_lims, momentum=momentum, dstr_fn=dstr_fn,
-                                                              input_dim=None, dtype=dtype, numx_rng=numx_rng)
+        super(GaussianContinuousExplorereNode, self).__init__(action_lims, dstr_fn=dstr_fn, input_dim=None,
+                                                              dtype=dtype, numx_rng=numx_rng)
 
         if sigma is None:
             self.sigma = mdp.numx.ones(len(action_lims[0]))
