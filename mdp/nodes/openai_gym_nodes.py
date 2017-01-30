@@ -170,6 +170,7 @@ class GymNode(mdp.OnlineNode):
             yield phi, a, r, done, info
 
     def _execute(self, x):
+        x = mdp.numx.clip(x, self.action_lims[0], self.action_lims[1])
         phi_, a, r, done, info = zip(*self._steps(x))
         phi_ = mdp.numx.reshape(phi_, [len(phi_), self.observation_dim])
         phi = mdp.numx.vstack((self._phi, phi_[:-1]))
