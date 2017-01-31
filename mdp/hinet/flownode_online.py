@@ -19,7 +19,7 @@ class OnlineFlowNode(FlowNode, mdp.OnlineNode):
     """
     def __init__(self, flow, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
         super(OnlineFlowNode, self).__init__(flow=flow, input_dim=input_dim, output_dim=output_dim, dtype=dtype)
-        self._check_compatibilitiy(flow)
+        self._check_compatibility(flow)
         self._cache = flow.cache
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
@@ -27,7 +27,7 @@ class OnlineFlowNode(FlowNode, mdp.OnlineNode):
         # set training type
         self._set_training_type_from_flow(flow)
 
-    def _check_compatibilitiy(self, flow):
+    def _check_compatibility(self, flow):
         if not isinstance(flow, mdp.OnlineFlow):
             raise TypeError("Flow must be an OnlineFlow type and not %s"%(type(flow)))
         if not isinstance(flow[-1], mdp.Node):
@@ -40,11 +40,11 @@ class OnlineFlowNode(FlowNode, mdp.OnlineNode):
                 raise TypeError("OnlineFlowNode supports either only a terminal OnlineNode, a trained or a non-trainable Node.")
 
     def _set_training_type_from_flow(self, flow):
+        self._training_type = None
         for node in flow:
-            if hasattr(node, 'training_type') and (node.training_type == 'incremental'):
-                self._training_type = 'incremental'
+            if hasattr(node, 'training_type') and (node.training_type == 'batch'):
+                self._training_type = 'batch'
                 return
-        self._training_type = 'batch'
 
     def set_training_type(self, training_type):
         if self.training_type != training_type:
@@ -137,7 +137,7 @@ class CircularOnlineFlowNode(FlowNode, mdp.OnlineNode):
     """
     def __init__(self, flow, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
         super(CircularOnlineFlowNode, self).__init__(flow=flow, input_dim=input_dim, output_dim=output_dim, dtype=dtype)
-        self._check_compatibilitiy(flow)
+        self._check_compatibility(flow)
         self._cache = flow.cache
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
@@ -155,16 +155,16 @@ class CircularOnlineFlowNode(FlowNode, mdp.OnlineNode):
     def get_stored_input(self):
         return self._stored_input
 
-    def _check_compatibilitiy(self, flow):
+    def _check_compatibility(self, flow):
         if not isinstance(flow, mdp.CircularOnlineFlow):
             raise TypeError("Flow must be a CircularOnlineFlow type and not %s" % (type(flow)))
 
     def _set_training_type_from_flow(self, flow):
+        self._training_type = None
         for node in flow:
-            if hasattr(node, 'training_type') and (node.training_type == 'incremental'):
-                self._training_type = 'incremental'
+            if hasattr(node, 'training_type') and (node.training_type == 'batch'):
+                self._training_type = 'batch'
                 return
-        self._training_type = 'batch'
 
     def set_training_type(self, training_type):
         if self.training_type != training_type:

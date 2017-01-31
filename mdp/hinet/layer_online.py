@@ -31,7 +31,7 @@ class OnlineLayer(Layer, mdp.OnlineNode):
         nodes -- List of the nodes to be used.
         """
         super(OnlineLayer, self).__init__(nodes, dtype=dtype)
-        self._check_compatibilitiy(nodes)
+        self._check_compatibility(nodes)
         self._cache = self._get_cache_from_nodes(nodes)
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
@@ -39,7 +39,7 @@ class OnlineLayer(Layer, mdp.OnlineNode):
         # set training type
         self._set_training_type_from_nodes(nodes)
 
-    def _check_compatibilitiy(self, nodes):
+    def _check_compatibility(self, nodes):
         [self._check_value_type_is_compatible(item) for item in nodes]
 
     def _check_value_type_is_compatible(self, value):
@@ -110,7 +110,7 @@ class CloneOnlineLayer(CloneLayer, OnlineLayer):
         n_nodes -- Number of repetitions/clones of the given node.
         """
         super(CloneOnlineLayer, self).__init__(node=node, n_nodes=n_nodes, dtype=dtype)
-        self._check_compatibilitiy([node])
+        self._check_compatibility([node])
         self._cache = node.cache
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
@@ -136,7 +136,7 @@ class SameInputOnlineLayer(SameInputLayer, OnlineLayer):
         nodes -- List of the nodes to be used.
         """
         super(SameInputOnlineLayer, self).__init__(nodes=nodes, dtype=dtype)
-        self._check_compatibilitiy(nodes)
+        self._check_compatibility(nodes)
         self._cache = self._get_cache_from_nodes(nodes)
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
