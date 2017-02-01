@@ -405,6 +405,9 @@ NODES = [
     dict(klass='GymNode',
          init_args=['MountainCar-v0'],
          inp_arg_gen=lambda: mdp.numx.random.randint(0,2, [3,1]).astype('float')),
+    dict(klass='GymContinuousExplorerNode',
+         init_args=['MountainCarContinuous-v0'],
+         inp_arg_gen=lambda: mdp.numx.random.uniform(0, 1, [3,1]).astype('float')),
     dict(klass='QRLNode',
          init_args=[5, 3],
          inp_arg_gen=lambda: mdp.numx.random.randint(0,3,[2,13]).astype('float')),
@@ -438,7 +441,6 @@ EXCLUDE_NODES = ['ICANode', 'LabelSpreadingScikitsLearnNode',
         'OutputCodeClassifierScikitsLearnNode', 'OneVsOneClassifierScikitsLearnNode',
         'OneVsRestClassifierScikitsLearnNode', 'VotingClassifierScikitsLearnNode',
          'PG2DNode', 'PGCurveNode', 'PGImageNode',
-                 # 'CaclaRLNode',
                  ]
 
 def generate_nodes_list(nodes_dicts):

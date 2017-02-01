@@ -98,8 +98,8 @@ if config.has_pyqtgraph:
     __all__+= ['PG2DNode', 'PGCurveNode', 'PGImageNode']
 
 if config.has_gym:
-    from .openai_gym_nodes import GymNode
-    __all__+=['GymNode']
+    from .openai_gym_nodes import GymNode, GymContinuousExplorerNode
+    __all__+=['GymNode', 'GymContinuousExplorerNode']
 
 from mdp import utils
 utils.fixup_namespace(__name__, __all__ + ['ICANode'],

@@ -197,3 +197,61 @@ class GymNode(mdp.OnlineNode):
     def get_environment_samples(self, n=1):
         # Generates random environment samples
         return self.execute(self.get_random_actions(n))
+
+
+class GymContinuousExplorerNode(GymNode):
+    """
+    Gym node that uses a continuous-action epsilon-greedy strategy to modulate between the given action and
+    actions generated via a random walk.
+
+    Only supports continuous action spaces
+    """
+
+    def __init__(self, env_name, epsilon=1.0, decay=1.0, action_std=None, action_momentum=0.,
+                 render=False, render_interval=1, auto_reset=False, dtype=None, numx_rng=None):
+        super(GymContinuousExplorerNode, self).__init__(env_name, render=render, render_interval=render_interval,
+                                              auto_reset=auto_reset, dtype=dtype, numx_rng=numx_rng)
+        if self.action_type == 'discrete':
+            raise mdp.NodeException("'GymContinuousExplorerNode supports only for 'continuous' actions, "
+                                    "given 'discrete'.")
+
+        self.epsilon = epsilon
+        self.decay = decay
+        self._cov = mdp.numx.identity(self.action_dim) if action_std is None else mdp.numx.diag(action_std)
+        self._m = action_momentum
+        self._a = mdp.numx.zeros(self.action_dim)
+
+    @staticmethod
+    def is_trainable():
+        return True
+
+    def _valid_action(self, a):
+        if hasattr(self.env, 'valid_action'):
+            return self.env.valid_action(a)
+        else:
+            return self.env.action_space.contains(a)
+
+    # environment steps
+    def _steps(self, x):
+        for a in x:
+            while 1:
+                rnd = self.numx_rng.multivariate_normal(mdp.numx.zeros(self.action_dim), self._cov)
+                self._a = self._m * self._a + (1 - self._m) * rnd
+                if self._valid_action(self._a):
+                    break
+                self._a /= 2
+
+            # explore/exploit
+            f = self.numx_rng.rand() < self.epsilon
+            a_ = f * self._a + (1 - f) * a
+
+            phi, r, done, info = self.env.step(a_)
+            self._render_step()
+            if self.auto_reset and done:
+                self.env.reset()
+                self._a = mdp.numx.zeros(self.action_dim)
+            yield phi, a_, r, done, info
+
+    def _train(self, x):
+        self.epsilon *= self.decay ** x.shape[0]
+
