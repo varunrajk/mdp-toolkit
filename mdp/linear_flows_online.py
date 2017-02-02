@@ -464,7 +464,7 @@ class CircularOnlineFlow(OnlineFlow):
         # If self._ignore_input is False, then total flow iterations = 1 external + (n-1) internal iterations.
         # if self._ignore input is True, then total flow iterations = n internal iterations.
         # See train method docstring for information on different training modes.
-        self._flow_iterations = n
+        self._flow_iterations = int(n)
 
     def _train_nodes(self, data_iterables):
         for x in data_iterables:

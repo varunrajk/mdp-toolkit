@@ -68,8 +68,6 @@ class BasisFunctionNode(mdp.Node):
 
         self._input_dim = len(lims[0])
 
-        self._fn = getattr(self, '_%s' % basis_name)
-
         self._basis_mode = 'continuous'
 
 
@@ -272,7 +270,8 @@ class BasisFunctionNode(mdp.Node):
         pass
 
     def _execute(self, x):
-        return self._refcast(self._fn(self._gp(x)) * self.scale_out)
+        _fn = getattr(self, '_%s' % self.basis_name)
+        return self._refcast(_fn(self._gp(x)) * self.scale_out)
 
     @staticmethod
     def _matplotlib_fig_arr(fig):
