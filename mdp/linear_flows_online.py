@@ -440,7 +440,7 @@ class CircularOnlineFlow(OnlineFlow):
         self._ignore_input = flag
 
     def set_flow_iterations(self, n):
-        self._flow_iterations = n
+        self._flow_iterations = int(n)
 
     def _train_nodes(self, data_iterables):
         for x in data_iterables:
