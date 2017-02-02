@@ -35,7 +35,7 @@ from .expansion_nodes import expanded_dim as _expanded_dim
 from .mca_nodes_online import MCANode
 from .pca_nodes_online import CCIPCANode, CCIPCAWhiteningNode
 from .sfa_nodes_online import IncSFANode
-from .stats_nodes_online import MovingAvgNode, MovingTimeDiffNode
+from .stats_nodes_online import OnlineCenteringNode, OnlineTimeDiffNode
 from .hsfa_nodes import HSFANode, HSFAPoolNode
 from .explorer_nodes import (DiscreteExplorerNode, ContinuousExplorerNode, EpsilonGreedyDiscreteExplorerNode,
                              EpsilonGreedyContinuousExplorerNode, BoltzmannDiscreteExplorerNode, GaussianContinuousExplorereNode,
@@ -61,7 +61,7 @@ __all__ = ['PCANode', 'WhiteningNode', 'NIPALSNode', 'FastICANode',
            'TimeFramesNode', 'TimeDelayNode', 'TimeDelaySlidingWindowNode',
            'CutoffNode', 'AdaptiveCutoffNode', 'HistogramNode',
            'IdentityNode', '_OneDimensionalHitParade',
-            'MovingAvgNode', 'MovingTimeDiffNode', 'CCIPCANode', 'CCIPCAWhiteningNode', 'MCANode',
+            'OnlineCenteringNode', 'OnlineTimeDiffNode', 'CCIPCANode', 'CCIPCAWhiteningNode', 'MCANode',
            'IncSFANode', 'HSFANode', 'HSFAPoolNode', 'NumxBufferNode',
            'DiscreteExplorerNode', 'ContinuousExplorerNode', 'EpsilonGreedyDiscreteExplorerNode',
            'EpsilonGreedyContinuousExplorerNode', 'BoltzmannDiscreteExplorerNode', 'GaussianContinuousExplorereNode',

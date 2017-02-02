@@ -1,7 +1,7 @@
 import mdp
 from .mca_nodes_online import MCANode
 from .pca_nodes_online import CCIPCAWhiteningNode as WhiteningNode
-from .stats_nodes_online import MovingAvgNode, MovingTimeDiffNode
+from .stats_nodes_online import OnlineCenteringNode, OnlineTimeDiffNode
 from mdp.utils import mult, pinv
 
 
@@ -56,11 +56,11 @@ class IncSFANode(mdp.OnlineNode):
         self.whiteningnode = WhiteningNode(input_dim=input_dim, output_dim=whitening_output_dim,
                                            dtype=dtype, numx_rng=numx_rng, init_eigen_vectors=init_pca_vectors,
                                            amn_params=amn_params)
-        self.tdiffnode = MovingTimeDiffNode(numx_rng=numx_rng, dtype=dtype)
+        self.tdiffnode = OnlineTimeDiffNode(numx_rng=numx_rng, dtype=dtype)
         self.mcanode = MCANode(input_dim=whitening_output_dim, output_dim=output_dim,
                                dtype=dtype, numx_rng=numx_rng, init_eigen_vectors=init_mca_vectors, eps=eps)
         if remove_mean:
-            self.avgnode = MovingAvgNode(numx_rng=numx_rng, avg_n=avg_n, dtype=dtype)
+            self.avgnode = OnlineCenteringNode(numx_rng=numx_rng, avg_n=avg_n, dtype=dtype)
 
         self.eps = eps
         self.whitening_output_dim = whitening_output_dim
