@@ -1,4 +1,3 @@
-
 import itertools
 import mdp
 
@@ -135,19 +134,10 @@ class GridProcessingNode(mdp.Node):
 
         self._graph_dim = self.n_grid_pts.shape[0]
         self._tot_graph_nodes = mdp.numx.product(self.n_grid_pts)
-        self._graph_lims = mdp.numx.array([mdp.numx.zeros(self._graph_dim), self. n_grid_pts - 1])
+        self._graph_lims = mdp.numx.array([mdp.numx.zeros(self._graph_dim), self.n_grid_pts - 1])
         self._graph_elem = mdp.numx.asarray(self._get_graph_elem(self._graph_dim,
                                                                  self.nbr_radius,
                                                                  self.nbr_dist_fn, self.include_central_elem))
-
-        self._input_output_fns = {}
-        for input_type in ['gridx', 'graphx', 'graphindx']:
-            for output_type in ['gridx', 'graphx', 'graphindx']:
-                if input_type == output_type:
-                    self._input_output_fns[(input_type, output_type)] = self._same_type
-                else:
-                    self._input_output_fns[(input_type, output_type)] = \
-                        getattr(self, '_%s_to_%s' % (input_type, output_type))
 
     @staticmethod
     def _get_graph_elem(graph_dim, radius, nbr_dist_fn, inclued_central_elem):
@@ -187,10 +177,6 @@ class GridProcessingNode(mdp.Node):
 
     # conversion methods
 
-    @staticmethod
-    def _same_type(x):
-        return x
-
     def _gridx_to_graphx(self, gridx):
         graphx = mdp.numx.zeros(gridx.shape)
         for i in xrange(self._graph_dim):
@@ -222,7 +208,7 @@ class GridProcessingNode(mdp.Node):
         graphindx = mdp.numx.zeros([gridx.shape[0], 1])
         for i in xrange(self._graph_dim):
             graphindx = graphindx * self.n_grid_pts[i] + \
-                        mdp.numx.argmin(mdp.numx.absolute(self._grid[i] - gridx[:, i:i+1]), axis=1)[:, None]
+                        mdp.numx.argmin(mdp.numx.absolute(self._grid[i] - gridx[:, i:i + 1]), axis=1)[:, None]
         return graphindx
 
     def _graphindx_to_gridx(self, graphindx):
@@ -232,7 +218,7 @@ class GridProcessingNode(mdp.Node):
             _d = int(mdp.numx.product(self.n_grid_pts[i + 1:]))
             graphx_i = _graphindx / _d
             _graphindx %= _d
-            gridx[:, i:i+1] = self._grid[i][graphx_i]
+            gridx[:, i:i + 1] = self._grid[i][graphx_i]
         return gridx
 
     @staticmethod
@@ -243,21 +229,29 @@ class GridProcessingNode(mdp.Node):
         pass
 
     def _execute(self, x):
-        return self._refcast(self._input_output_fns[('gridx', self.output_type)](x))
+        y = x
+        if self.output_type == 'graphx':
+            y = self._gridx_to_graphx(x)
+        elif self.output_type == 'graphindx':
+            y = self._gridx_to_graphindx(x)
+        return self._refcast(y)
 
     def _inverse(self, y):
-        return self._refcast(self._input_output_fns[(self.output_type, 'gridx')](self._refcast(y)))
+        x = y
+        if self.output_type == 'graphx':
+            x = self._graphx_to_gridx(y)
+        elif self.output_type == 'graphindx':
+            x = self._graphindx_to_gridx(y)
+        return self._refcast(x)
 
     # utility methods
     def get_neighbors(self, gridx):
         return self._graphx_to_gridx(self._get_graph_neighbors(self._gridx_to_graphx(gridx)))
 
     def get_adjacency_matrix(self):
-        A = mdp.numx.zeros([self._tot_graph_nodes, self._tot_graph_nodes])
-        for i in xrange(A.shape[0]):
+        adj = mdp.numx.zeros([self._tot_graph_nodes, self._tot_graph_nodes])
+        for i in xrange(adj.shape[0]):
             i_arr = mdp.numx.array([[i]]).astype('float')
             for j in self._graphx_to_graphindx(self._get_graph_neighbors(self._graphindx_to_graphx(i_arr))):
-                A[i, int(j)] = 1
-        return self._refcast(A)
-
-
+                adj[i, int(j)] = 1
+        return self._refcast(adj)
