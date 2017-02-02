@@ -441,7 +441,6 @@ EXCLUDE_NODES = ['ICANode', 'LabelSpreadingScikitsLearnNode',
         'OutputCodeClassifierScikitsLearnNode', 'OneVsOneClassifierScikitsLearnNode',
         'OneVsRestClassifierScikitsLearnNode', 'VotingClassifierScikitsLearnNode',
          'PG2DNode', 'PGCurveNode', 'PGImageNode',
-                 # 'CaclaRLNode',
                  ]
 
 def generate_nodes_list(nodes_dicts):
