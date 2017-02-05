@@ -472,7 +472,10 @@ class CircularOnlineFlow(OnlineFlow):
                 # ignore external input
                 x = self.get_stored_input()
             # train the loop for 'self.flow_iterations' iterations
-            for _ in xrange(self._flow_iterations):
+            _iters = xrange(self._flow_iterations)
+            if self.verbose:
+                _iters = mdp.utils.progressinfo(_iters)
+            for _ in _iters:
                 for nodenr in xrange(len(self.flow)):
                     try:
                         node = self.flow[nodenr]
