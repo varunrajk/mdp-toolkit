@@ -185,7 +185,7 @@ class GymNode(mdp.OnlineNode):
     def _train(self, x):
         pass
 
-    # utility methods
+    # public utility methods
 
     def stop_rendering(self):
         # stop gym's rendering if active
@@ -209,21 +209,31 @@ class GymContinuousExplorerNode(GymNode):
 
     def __init__(self, env_name, epsilon=1.0, decay=1.0, action_std=None, action_momentum=0.,
                  render=False, render_interval=1, auto_reset=False, dtype=None, numx_rng=None):
+
+        self.epsilon = epsilon
+        self._decay = decay
+        if self.decay < 1.:
+            self._is_trainable = True
+        else:
+            self._is_trainable = False
+
         super(GymContinuousExplorerNode, self).__init__(env_name, render=render, render_interval=render_interval,
                                               auto_reset=auto_reset, dtype=dtype, numx_rng=numx_rng)
         if self.action_type == 'discrete':
             raise mdp.NodeException("'GymContinuousExplorerNode supports only for 'continuous' actions, "
                                     "given 'discrete'.")
 
-        self.epsilon = epsilon
-        self.decay = decay
         self._cov = mdp.numx.identity(self.action_dim) if action_std is None else mdp.numx.diag(action_std)
         self._m = action_momentum
         self._a = mdp.numx.zeros(self.action_dim)
 
-    @staticmethod
-    def is_trainable():
-        return True
+    def is_trainable(self):
+        return self._is_trainable
+
+    @property
+    def decay(self):
+        """Return decay. Read only parameter"""
+        return self._decay
 
     def _valid_action(self, a):
         if hasattr(self.env, 'valid_action'):
