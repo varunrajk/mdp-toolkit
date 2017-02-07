@@ -70,7 +70,6 @@ class BasisFunctionNode(mdp.Node):
 
         self._basis_mode = 'continuous'
 
-
         # Basis Fns Init
 
         if self.basis_name is 'indicator':
@@ -119,7 +118,7 @@ class BasisFunctionNode(mdp.Node):
             self._basis_mode = 'discrete'
             if basis_params is None:
                 print ("\n'%s' basis function also takes optional arguments via \n'basis_params' = "
-                        "%s (as a list or dict). Since the given 'basis_params' in set to None, \ndefault "
+                       "%s (as a list or dict). Since the given 'basis_params' in set to None, \ndefault "
                        "values=%s are used." % (basis_name, str(opt_args), str(default_args_str)))
                 basis_params = [self._gp.get_adjacency_matrix()]
             if isinstance(basis_params, list):
@@ -428,12 +427,12 @@ class BasisFunctionNode(mdp.Node):
         elif self.input_dim == 2:
             if self._basis_mode == 'discrete':
                 _x, _y = mdp.numx.meshgrid(mdp.numx.linspace(self.lims[0, 0], self.lims[1, 0],
-                                                           self.lims[1, 0] + 1, endpoint=True),
-                                         mdp.numx.linspace(self.lims[0, 1], self.lims[1, 1],
-                                                           self.lims[1, 1] + 1, endpoint=True))
+                                                             self.lims[1, 0] + 1, endpoint=True),
+                                           mdp.numx.linspace(self.lims[0, 1], self.lims[1, 1],
+                                                             self.lims[1, 1] + 1, endpoint=True))
             else:
                 _x, _y = mdp.numx.meshgrid(mdp.numx.linspace(self.lims[0, 0], self.lims[1, 0], 20, endpoint=True),
-                                         mdp.numx.linspace(self.lims[0, 1], self.lims[1, 1], 20, endpoint=True))
+                                           mdp.numx.linspace(self.lims[0, 1], self.lims[1, 1], 20, endpoint=True))
             x = mdp.numx.asarray(zip(_x.ravel(), _y.ravel()))
             z = self._execute(x.astype('float'))
             _tmp1 = _tmp2 = int(mdp.numx.ceil(mdp.numx.sqrt(z.shape[1])))
@@ -442,3 +441,17 @@ class BasisFunctionNode(mdp.Node):
             return self._tile_raster_images(x=z.T, img_shape=(_x.shape[0], _x.shape[1]), tile_shape=(_tmp1, _tmp2),
                                             tile_spacing=(1, 1), output_pixel_vals=False)
         return None
+
+    def __repr__(self):
+        name = type(self).__name__
+        basis_name = "observation_dim=%s" % str(self.basis_name)
+        lims = "action_dim=%s" % str(self.lims)
+        order = "alpha=%s" % str(self.order)
+        decoupled = "beta=%s" % str(self.decoupled)
+        basis_params = "gamma=%s" % str(self.basis_params)
+        scale_out = "output_mode='%s'" % str(self.scale_out)
+        n_grid_pts = "input_dim=%s" % str(self._gp.n_grid_pts)
+        input_dim = "input_dim=%s" % str(self.input_dim)
+        dtype = "dtype=%s" % str(self.dtype)
+        args = ', '.join((basis_name, lims, order, decoupled, basis_params, scale_out, n_grid_pts, input_dim, dtype))
+        return name + '(' + args + ')'

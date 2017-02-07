@@ -83,3 +83,17 @@ class CaclaRLNode(mdp.RLNode):
         else:
             raise mdp.NodeException("Unrecognized 'output_mode'. Accepted values: 'action' and "
                                     "'value', given %s." % str(self.output_mode))
+
+    def __repr__(self):
+        name = type(self).__name__
+        observation_dim = "observation_dim=%s" % str(self.observation_dim)
+        action_dim = "action_dim=%s" % str(self.action_dim)
+        alpha = "alpha=%s" % str(self._alpha)
+        beta = "beta=%s" % str(self._beta)
+        gamma = "gamma=%s" % str(self._gamma)
+        output_mdoe = "output_mode='%s'" % str(self.output_mode)
+        input_dim = "input_dim=%s" % str(self.input_dim)
+        dtype = "dtype=%s" % str(self.dtype)
+        numx_rng = "numx_rng=%s" % str(self.numx_rng)
+        args = ', '.join((observation_dim, action_dim, alpha, beta, gamma, output_mdoe, input_dim, dtype, numx_rng))
+        return name + '(' + args + ')'
