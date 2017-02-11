@@ -118,7 +118,7 @@ class BasisFunctionNode(mdp.Node):
             self._basis_mode = 'discrete'
             if basis_params is None:
                 print ("\n'%s' basis function also takes optional arguments via \n'basis_params' = "
-                       "%s (as a list or dict). Since the given 'basis_params' in set to None, \ndefault "
+                       "%s (as a list or dict). \nSince the given 'basis_params' in set to None, \ndefault "
                        "values=%s are used." % (basis_name, str(opt_args), str(default_args_str)))
                 basis_params = [self._gp.get_adjacency_matrix()]
             if isinstance(basis_params, list):
@@ -146,7 +146,7 @@ class BasisFunctionNode(mdp.Node):
             if basis_params is None:
                 if basis_params is None:
                     print ("\n'%s' basis function also takes optional arguments via \n'basis_params' = "
-                           "%s (as a list or dict). Since the given 'basis_params' in set to None, \ndefault "
+                           "%s (as a list or dict). \nSince the given 'basis_params' in set to None, \ndefault "
                            "values=%s are used." % (basis_name, str(opt_args), str(default_args_str)))
                 basis_params = [self._gp.get_adjacency_matrix(), 3, 3, 4]
 
@@ -444,13 +444,13 @@ class BasisFunctionNode(mdp.Node):
 
     def __repr__(self):
         name = type(self).__name__
-        basis_name = "observation_dim=%s" % str(self.basis_name)
-        lims = "action_dim=%s" % str(self.lims)
-        order = "alpha=%s" % str(self.order)
-        decoupled = "beta=%s" % str(self.decoupled)
-        basis_params = "gamma=%s" % str(self.basis_params)
-        scale_out = "output_mode='%s'" % str(self.scale_out)
-        n_grid_pts = "input_dim=%s" % str(self._gp.n_grid_pts)
+        basis_name = "basis_name=%s" % str(self.basis_name)
+        lims = "lims=%s" % str([list(self.lims[0]), list(self.lims[1])])
+        order = "order=%s" % str(self.order)
+        decoupled = "decoupled=%s" % str(self.decoupled)
+        basis_params = "basis_params=%s" % str(self.basis_params)
+        scale_out = "scale_out='%s'" % str(self.scale_out)
+        n_grid_pts = "n_grid_pts=%s" % str(self._gp.n_grid_pts)
         input_dim = "input_dim=%s" % str(self.input_dim)
         dtype = "dtype=%s" % str(self.dtype)
         args = ', '.join((basis_name, lims, order, decoupled, basis_params, scale_out, n_grid_pts, input_dim, dtype))
