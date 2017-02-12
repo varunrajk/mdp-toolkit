@@ -32,7 +32,6 @@ class OnlineLayer(Layer, mdp.OnlineNode):
         """
         super(OnlineLayer, self).__init__(nodes, dtype=dtype)
         self._check_compatibility(nodes)
-        self._cache = self._get_cache_from_nodes(nodes)
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
         self.numx_rng = numx_rng
@@ -52,15 +51,6 @@ class OnlineLayer(Layer, mdp.OnlineNode):
             # classic mdp Node
             if value.is_training():
                 raise TypeError("'nodes' item must either be an OnlineNode, a trained or a non-trainable Node.")
-
-    def _get_cache_from_nodes(self, nodes):
-        _cache = {}
-        for i, node in enumerate(nodes):
-            if not hasattr(node, 'cache'):
-                _cache['node#%d' % (i)] = {}
-            else:
-                _cache['node#%d' % (i)] = node.cache
-        return _cache
 
     def _set_training_type_from_nodes(self, nodes):
         for node in nodes:
@@ -111,7 +101,6 @@ class CloneOnlineLayer(CloneLayer, OnlineLayer):
         """
         super(CloneOnlineLayer, self).__init__(node=node, n_nodes=n_nodes, dtype=dtype)
         self._check_compatibility([node])
-        self._cache = node.cache
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
         self.numx_rng = numx_rng
@@ -137,7 +126,6 @@ class SameInputOnlineLayer(SameInputLayer, OnlineLayer):
         """
         super(SameInputOnlineLayer, self).__init__(nodes=nodes, dtype=dtype)
         self._check_compatibility(nodes)
-        self._cache = self._get_cache_from_nodes(nodes)
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
         self.numx_rng = numx_rng

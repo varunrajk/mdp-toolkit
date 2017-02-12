@@ -158,10 +158,12 @@ class GridProcessingNode(mdp.Node):
 
     @property
     def output_type(self):
+        """Returns the output type."""
         return self._output_type
 
     @output_type.setter
     def output_type(self, typ):
+        """Sets the output type."""
         if typ is None:
             typ = 'gridx'
         elif typ not in ['gridx', 'graphx', 'graphindx']:
@@ -246,9 +248,11 @@ class GridProcessingNode(mdp.Node):
 
     # utility methods
     def get_neighbors(self, gridx):
+        """Returns the neighboring grid points based on a distance function applied to the graph coordinates."""
         return self._graphx_to_gridx(self._get_graph_neighbors(self._gridx_to_graphx(gridx)))
 
     def get_adjacency_matrix(self):
+        """Returns an adjacency matrix of the graph."""
         adj = mdp.numx.zeros([self._tot_graph_nodes, self._tot_graph_nodes])
         for i in xrange(adj.shape[0]):
             i_arr = mdp.numx.array([[i]]).astype('float')

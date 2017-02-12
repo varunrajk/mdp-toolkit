@@ -20,7 +20,6 @@ class OnlineFlowNode(FlowNode, mdp.OnlineNode):
     def __init__(self, flow, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
         super(OnlineFlowNode, self).__init__(flow=flow, input_dim=input_dim, output_dim=output_dim, dtype=dtype)
         self._check_compatibility(flow)
-        self._cache = flow.cache
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
         self.numx_rng = numx_rng
@@ -138,7 +137,6 @@ class CircularOnlineFlowNode(FlowNode, mdp.OnlineNode):
     def __init__(self, flow, input_dim=None, output_dim=None, dtype=None, numx_rng=None):
         super(CircularOnlineFlowNode, self).__init__(flow=flow, input_dim=input_dim, output_dim=output_dim, dtype=dtype)
         self._check_compatibility(flow)
-        self._cache = flow.cache
         # numx_rng will not be set through the super call.
         # Have to set it explicitly here:
         self.numx_rng = numx_rng

@@ -1,4 +1,3 @@
-
 import mdp
 from mdp.utils import mult
 
@@ -6,6 +5,14 @@ from mdp.utils import mult
 class CaclaRLNode(mdp.RLNode):
     """
     CaclaRLNode implements the Continuous Actor-Critic Learning Automaton reinforcement learning algorithm.
+    More information about CACLA can be found in "Reinforcement learning in continuous action spaces",
+    H. V. Hasselt and M. A. Wiering, Approximate Dynamic Programming and Reinforcement Learning, pp 272--279,
+    ADPRL 2007.
+
+    **Instance variables of interest**
+
+      ``self.td_err``
+         temporal difference error
 
     """
 
@@ -45,8 +52,6 @@ class CaclaRLNode(mdp.RLNode):
         elif self.output_mode == 'value':
             self.output_dim = 1
 
-        self._cache = {'td_err': 0., 'value_params': None, 'policy_params': None}
-
     def _check_params(self, x):
         if self._theta is None:
             self._theta = 0.1 * self.numx_rng.randn(self.observation_dim, 1).astype(self.dtype)
@@ -70,9 +75,13 @@ class CaclaRLNode(mdp.RLNode):
         self._theta += grad_theta
         self._psi += grad_psi
 
-        self.cache['td_err'] = td_err
-        self.cache['value_params'] = self._theta.copy()
-        self.cache['policy_params'] = self._psi.copy()
+    def get_value_params(self):
+        """Returns value function parameters"""
+        return self._theta.copy()
+
+    def get_policy_params(self):
+        """Returns policy function parameters"""
+        return self._psi.copy()
 
     def _execute(self, *args):
         phi_ = args[1]

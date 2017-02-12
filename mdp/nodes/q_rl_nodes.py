@@ -1,15 +1,17 @@
-
 import mdp
 from mdp.utils import mult
 
 
 class QRLNode(mdp.RLNode):
     """
-    QRLNode implements the Q reinforcement learning algorithm.
+    QRLNode implements the Q reinforcement learning algorithm. More information can be found in
+    Sutton, Richard S., and Andrew G. Barto. Reinforcement learning: An introduction. Vol. 1. No. 1.
+    Cambridge: MIT press, 1998.
 
     Supports only discrete actions.
 
     """
+
     def __init__(self, observation_dim, n_actions, alpha=1., gamma=0.99, output_mode='action',
                  dtype=None, numx_rng=None):
         """
@@ -26,7 +28,7 @@ class QRLNode(mdp.RLNode):
                     'value' - returns q-values for all actions for the given observation(s)
         """
         super(QRLNode, self).__init__(observation_dim=observation_dim, action_dim=1, reward_dim=1,
-                                            dtype=dtype, numx_rng=numx_rng)
+                                      dtype=dtype, numx_rng=numx_rng)
         self._n_actions = n_actions
         self._alpha = alpha
         self._gamma = gamma
@@ -42,7 +44,6 @@ class QRLNode(mdp.RLNode):
             self.output_dim = self._n_actions
 
         self.output_mode = output_mode
-        self._cache = {'td_err': 0., 'value_params': None}
 
     @property
     def n_actions(self):
@@ -79,9 +80,6 @@ class QRLNode(mdp.RLNode):
         grad_theta = self._alpha * mult(phi.T, td_err_a)
         self._theta += grad_theta
 
-        self.cache['td_err'] = td_err
-        self.cache['value_params'] = self._theta.copy()
-
     def _execute(self, *args):
         phi_ = args[1]
         if self.output_mode == 'action':
@@ -98,10 +96,13 @@ class QRLNode(mdp.RLNode):
 class QLambdaRLNode(QRLNode):
     """
     QLambdaRLNode implements the Q reinforcement learning algorithm with eligibility traces (Peng's Qlambda).
+    More information can be found in Peng, J. (1993). Efficient Dynamic Programming-BasedLearning for Control.
+    PhD thesis, Northeastern University, Boston.
 
     Supports only discrete actions.
 
     """
+
     def __init__(self, observation_dim, n_actions, alpha=1., gamma=0.99, traces_lambda=0., output_mode='action',
                  dtype=None, numx_rng=None):
         """
@@ -139,6 +140,3 @@ class QLambdaRLNode(QRLNode):
                 self._e = mdp.numx.zeros([self.observation_dim, self.n_actions], dtype=self.dtype)
 
         self._theta += grad_theta
-
-        self.cache['td_err'] = td_err
-        self.cache['value_params'] = self._theta.copy()

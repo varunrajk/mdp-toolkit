@@ -401,7 +401,7 @@ class BasisFunctionNode(mdp.Node):
             return out_array
 
     def get_fn_responses_img(self):
-        # returns an image of features sampled from the environment
+        """returns an image of features sampled from the environment"""
         if self.input_dim == 1:
             from matplotlib import pyplot as plt
 

@@ -21,18 +21,17 @@ def test_incsfa_v2():
     bsfanode(input_data)
     bv = bsfanode.sf
 
-    monitor_var = {'slow_features':[]}
+    v = []
 
     _tcnt = time.time()
     for i in xrange(iterval*input_data.shape[0]):
         node.train(input_data[i%input_data.shape[0]:i%input_data.shape[0]+1])
         if (node.get_current_train_iteration() % 100 == 0):
-            monitor_var = mdp.utils.update_dict_lists(node.get_cache(), monitor_var)
+            v.append(node.sf)
 
     print ''
     print 'Total Time for %d iterations: ' % (iterval), time.time() - _tcnt
 
-    v = monitor_var['slow_features']
     dcosines = numx.zeros([len(v), output_dim])
     for i in xrange(len(v)):
         for dim in xrange(output_dim):

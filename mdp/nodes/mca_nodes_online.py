@@ -12,12 +12,12 @@ class MCANode(mdp.OnlineNode):
     2(2):207--215, 2006.
 
 
-    **Instance variables of interest (stored in cache)**
+    **Instance variables of interest**
 
-      ``eigen_vectors`` (can also be accessed as self.v)
+      ``self.v``
          Eigen vectors
 
-      ``eigen_values`` (can also be accessed as self.d)
+      ``self.d``
          Eigen values
 
 
@@ -44,8 +44,6 @@ class MCANode(mdp.OnlineNode):
 
         self.v = None  # Eigenvectors
         self.d = None  # Eigenvalues
-
-        self._cache = {'eigen_vectors': None, 'eigen_values': None}
 
     @property
     def init_eigen_vectors(self):
@@ -100,9 +98,6 @@ class MCANode(mdp.OnlineNode):
             self.d[j] = mdp.numx.sqrt(l)
             if self.normalize:
                 self.v[:, j:j + 1] = old_div(v, self.d[j])
-
-        self.cache['eigen_vectors'] = self.v.copy()
-        self.cache['eigen_values'] = self.d.copy()
 
     def get_projmatrix(self, transposed=1):
         """Return the projection matrix."""

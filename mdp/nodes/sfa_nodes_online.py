@@ -15,15 +15,15 @@ class IncSFANode(mdp.OnlineNode):
     High-Dimensional Input Streams, Neural Computation, 2012.
 
 
-    **Instance variables of interest (stored in cache)**
+    **Instance variables of interest**
 
-      ``slow_features`` (can also be accessed as self.sf)
+      ``self.sf``
          Slow feature vectors
 
-      ``whitening_vectors``
+      ``self.wv``
          Whitening vectors
 
-      ``weight_change``
+      ``self.sf_change``
          Difference in slow features after update
 
     """
@@ -73,9 +73,7 @@ class IncSFANode(mdp.OnlineNode):
         self._init_sf = None
         self.wv = None
         self.sf = None
-
-        # cache to store variables
-        self._cache = {'slow_features': None, 'whitening_vectors': None, 'weight_change': None}
+        self.sf_change = 0.
 
     def _set_input_dim(self, n):
         self._input_dim = n
@@ -183,9 +181,8 @@ class IncSFANode(mdp.OnlineNode):
                 self._new_episode = new_episode
             sf_change = self._step_train(x)
 
-        self.cache['slow_features'] = self.sf.copy()
-        self.cache['whitening_vectors'] = self.whiteningnode.cache['eigen_vectors']
-        self.cache['weight_change'] = sf_change
+        self.wv = self.whiteningnode.v
+        self.sf_change = sf_change
 
     def _execute(self, x):
         if self.remove_mean:

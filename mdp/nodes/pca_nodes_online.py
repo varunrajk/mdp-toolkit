@@ -13,12 +13,12 @@ class CCIPCANode(mdp.OnlineNode):
     IEEE Trans. Pattern Analysis and Machine Intelligence,
     vol. 25, 1034--1040, 2003.
 
-    **Instance variables of interest (stored in cache)**
+    **Instance variables of interest**
 
-      ``eigen_vectors`` (can also be accessed as self.v)
+      ``self.v``
          Eigen vectors
 
-      ``eigen_values`` (can also be accessed as self.d)
+      ``self.d``
          Eigen values
 
     """
@@ -49,7 +49,6 @@ class CCIPCANode(mdp.OnlineNode):
 
         self._var_tot = 1.0
         self._reduced_dims = self.output_dim
-        self._cache = {'eigen_vectors': None, 'eigen_values': None}
 
     @property
     def init_eigen_vectors(self):
@@ -124,9 +123,6 @@ class CCIPCANode(mdp.OnlineNode):
 
         self._var_tot = explained_var
         self._reduced_dims = red_j
-
-        self.cache['eigen_vectors'] = self.v.copy()
-        self.cache['eigen_values'] = self.d.copy()
 
     def get_var_tot(self):
         """Return the  variance that can be
@@ -206,16 +202,15 @@ class CCIPCAWhiteningNode(CCIPCANode):
     def _train(self, x):
         super(CCIPCAWhiteningNode, self)._train(x)
         self.v = old_div(self.v, mdp.numx.sqrt(self.d))
-        self.cache['eigen_vectors'] = self.v
 
     def get_eigenvectors(self):
         """Return the eigenvectors of the covariance matrix."""
-        return mdp.numx.sqrt(self.d)*self.v
+        return mdp.numx.sqrt(self.d) * self.v
 
     def get_recmatrix(self, transposed=1):
         """Return the back-projection matrix (i.e. the reconstruction matrix).
         """
-        v_inverse = self.v*self.d
+        v_inverse = self.v * self.d
         if transposed:
             return v_inverse.T
         return v_inverse

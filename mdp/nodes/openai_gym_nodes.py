@@ -43,7 +43,7 @@ class GymNode(mdp.OnlineNode):
       ``self.observation_lims / self.action_lims``
          Upper and lower bounds of observation / action space.
 
-      ``n_observations / n_actions``
+      ``self.n_observations / self.n_actions``
          Number of observations or actions for discrete types.
 
     """
@@ -114,13 +114,11 @@ class GymNode(mdp.OnlineNode):
         self._flow_time = 0
         self._tlen = 0
 
-        # cache to store variables
-        self._cache = {'info': None}
-
     # properties
 
     @property
     def env_name(self):
+        """Returns the environment name"""
         return self._env_name  # read only
 
     def _get_similar_env_names(self, name):
@@ -179,7 +177,6 @@ class GymNode(mdp.OnlineNode):
         r = mdp.numx.reshape(r, [len(r), 1])
         done = mdp.numx.reshape(done, [len(done), 1])
         y = mdp.numx.hstack((phi, phi_, a, r, done))
-        self.cache['info'] = info[-1]
         return self._refcast(y)
 
     def _train(self, x):
@@ -188,14 +185,15 @@ class GymNode(mdp.OnlineNode):
     # public utility methods
 
     def stop_rendering(self):
-        # stop gym's rendering if active
+        """stop gym's rendering if active"""
         self.env.render(close=True)
 
     def get_random_actions(self, n=1):
+        """Returns the specified number of randomly (uniform) sampled actions."""
         return self._refcast(mdp.numx.reshape([self.env.action_space.sample() for _ in xrange(n)], (n, self.input_dim)))
 
     def get_environment_samples(self, n=1):
-        # Generates random environment samples
+        """Returns observations corresponding to the specified number of randomly (uniform) sampled actions."""
         return self.execute(self.get_random_actions(n))
 
 
@@ -218,7 +216,7 @@ class GymContinuousExplorerNode(GymNode):
             self._is_trainable = False
 
         super(GymContinuousExplorerNode, self).__init__(env_name, render=render, render_interval=render_interval,
-                                              auto_reset=auto_reset, dtype=dtype, numx_rng=numx_rng)
+                                                        auto_reset=auto_reset, dtype=dtype, numx_rng=numx_rng)
         if self.action_type == 'discrete':
             raise mdp.NodeException("'GymContinuousExplorerNode supports only for 'continuous' actions, "
                                     "given 'discrete'.")
@@ -264,4 +262,3 @@ class GymContinuousExplorerNode(GymNode):
 
     def _train(self, x):
         self.epsilon *= self.decay ** x.shape[0]
-

@@ -1,4 +1,3 @@
-
 import mdp
 from mdp import NodeException, IsNotTrainableException
 from mdp import TrainingException, TrainingFinishedException, IsNotInvertibleException
@@ -13,7 +12,6 @@ class OnlineNodeException(NodeException):
 
 
 class OnlineNode(Node):
-
     """An online Node (OnlineNode) is the basic building block of
         an online MDP application.
 
@@ -72,10 +70,6 @@ class OnlineNode(Node):
         super(OnlineNode, self).__init__(input_dim, output_dim, dtype)
         # this var stores the index of the current training iteration
         self._train_iteration = 0
-        # this cache var dict stores an interemediate result or paramenter values
-        # at the end of each train iteration. OnlineNode subclasses should
-        # initialize the required keys
-        self._cache = dict()
         # this var stores random number generator
         self._numx_rng = None
         self.set_numx_rng(numx_rng)
@@ -98,8 +92,8 @@ class OnlineNode(Node):
         if rng is None:
             pass
         elif not isinstance(rng, mdp.numx_rand.mtrand.RandomState):
-                raise OnlineNodeException('numx_rng should be of type %s but given %s'
-                                    % (str(mdp.numx_rand.mtrand.RandomState), str(type(rng))))
+            raise OnlineNodeException('numx_rng should be of type %s but given %s'
+                                      % (str(mdp.numx_rand.mtrand.RandomState), str(type(rng))))
         else:
             self._set_numx_rng(rng)
 
@@ -107,13 +101,8 @@ class OnlineNode(Node):
         self._numx_rng = rng
 
     numx_rng = property(get_numx_rng,
-                         set_numx_rng,
-                         doc="Numpy seeded random number generator")
-
-    def get_cache(self):
-        return self._cache
-
-    cache = property(get_cache, doc="Internal cache dict")
+                        set_numx_rng,
+                        doc="Numpy seeded random number generator")
 
     @property
     def training_type(self):
@@ -132,7 +121,7 @@ class OnlineNode(Node):
             self._training_type = training_type
         else:
             raise OnlineNodeException("Unknown training type specified %s. Supported types "
-                                "%s" % str(self._get_supported_training_types()))
+                                      "%s" % str(self._get_supported_training_types()))
 
     # Each element in the _train_seq contains three sub elements
     # (training-phase, stop-training-phase, execution-phase)
@@ -448,18 +437,18 @@ class RLNode(OnlineNode):
 
     def _split_data_dims(self, x):
         # split the data dims
-        _d = (self.observation_dim*2 + self.action_dim + self.reward_dim + 1)
+        _d = (self.observation_dim * 2 + self.action_dim + self.reward_dim + 1)
         if x.shape[1] < _d:
             raise mdp.TrainingException("input x requires minimum %d dims, given %d." % (_d, x.shape[1]))
         elif x.shape[1] == _d:
             dims = [self.observation_dim, self.observation_dim, self.action_dim, self.reward_dim, 1]
         else:
-            dims = [self.observation_dim, self.observation_dim, self.action_dim, self.reward_dim, 1, x.shape[1]-_d]
+            dims = [self.observation_dim, self.observation_dim, self.action_dim, self.reward_dim, 1, x.shape[1] - _d]
 
         out = []
         start_indx = 0
         for i in xrange(len(dims)):
-            out.append(x[:, start_indx:start_indx+dims[i]])
+            out.append(x[:, start_indx:start_indx + dims[i]])
             start_indx += dims[i]
         return out
 
@@ -468,7 +457,9 @@ class RLNode(OnlineNode):
             def _train(x, *args, **kwargs):
                 inp = self._split_data_dims(x) + list(args)
                 self._train(*inp, **kwargs)
+
             return _train
+
         return [(get_train_function(), self._stop_training, lambda x, *args, **kwargs: x)]
 
     # Methods to be implemented or overwritten by the user
