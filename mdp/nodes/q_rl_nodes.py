@@ -64,8 +64,8 @@ class QRLNode(mdp.RLNode):
         """Returns greedy action(s)."""
         return self.get_value(phi).argmax(axis=1)[:, None].astype(self.dtype)
 
-    def _train(self, *args):
-        phi, phi_, a, r, done = args[:5]
+    def _train(self, x):
+        phi, phi_, a, r, done = self._split_x(x)
         a = a.astype('int')
 
         q = self.get_value(phi, a)
@@ -80,8 +80,8 @@ class QRLNode(mdp.RLNode):
         grad_theta = self._alpha * mult(phi.T, td_err_a)
         self._theta += grad_theta
 
-    def _execute(self, *args):
-        phi_ = args[1]
+    def _execute(self, x):
+        phi_ = self._split_x(x)[1]
         if self.output_mode == 'action':
             return self.get_action(phi_)
         elif self.output_mode == 'value':
@@ -121,8 +121,8 @@ class QLambdaRLNode(QRLNode):
         if self._e is None:
             self._e = mdp.numx.zeros([self.observation_dim, self.n_actions], dtype=self.dtype)
 
-    def _train(self, *args):
-        phi, phi_, a, r, done = args[:5]
+    def _train(self, x):
+        phi, phi_, a, r, done = self._split_x(x)
         a = a.astype('int')
 
         q = self.get_value(phi, a)

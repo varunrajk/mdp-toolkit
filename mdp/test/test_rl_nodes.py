@@ -44,11 +44,11 @@ class BogusEnv(OnlineNode):
 
 
 class BogusRLNode(RLNode):
-    def _train(self, *args):
-        self.phi, self.phi_, self.a, self.r, self.done = args[:5]
+    def _train(self, x):
+        self.phi, self.phi_, self.a, self.r, self.done = self._split_x(x)[:5]
 
-    def _execute(self, *args):
-        return args[:5]
+    def _execute(self, x):
+        return self._split_x(x)[:5]
 
 
 def test_rlnode():

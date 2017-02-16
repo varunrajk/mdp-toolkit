@@ -52,6 +52,8 @@ class CaclaRLNode(mdp.RLNode):
         elif self.output_mode == 'value':
             self.output_dim = 1
 
+        self.td_err = 0.0
+
     def _check_params(self, x):
         if self._theta is None:
             self._theta = 0.1 * self.numx_rng.randn(self.observation_dim, 1).astype(self.dtype)
@@ -67,13 +69,14 @@ class CaclaRLNode(mdp.RLNode):
         """Returns greedy action(s)."""
         return mult(phi, self._psi)
 
-    def _train(self, *args):
-        phi, phi_, a, r, done = args[:5]
+    def _train(self, x):
+        phi, phi_, a, r, done = self._split_x(x)
         td_err = r + self._gamma * self.get_value(phi_) - self.get_value(phi)
         grad_theta = self._alpha * mult(phi.T, td_err)
         grad_psi = self._beta * mult(phi.T, (td_err > 0) * (a - self.get_action(phi)))
         self._theta += grad_theta
         self._psi += grad_psi
+        self.td_err = td_err
 
     def get_value_params(self):
         """Returns value function parameters"""
@@ -83,8 +86,8 @@ class CaclaRLNode(mdp.RLNode):
         """Returns policy function parameters"""
         return self._psi.copy()
 
-    def _execute(self, *args):
-        phi_ = args[1]
+    def _execute(self, x):
+        phi_ = self._split_x(x)[1]
         if self.output_mode == 'action':
             return self.get_action(phi_)
         elif self.output_mode == 'value':

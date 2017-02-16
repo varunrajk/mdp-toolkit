@@ -374,31 +374,14 @@ class RLNode(OnlineNode):
         a reinforcement learning (RL) application. It inherits
         all OnlineNode features and capabilities.
 
-        Most RL algorithms require sequence of tuples
+        Most RL algorithms require a sequence of tuples
         (Current observation, future observation, action, reward, episode_done flag)
-        as an input to update either a policy or a value function.
+        to update either a policy or a value function. RLNode expects the
+        data to be a concatenated array of such tuples.
 
-        Therefore, the input data 'x' to an RLNode is a concatenated 2D array
-        of these tuples.
-
-        `RLNode` subclasses should take care of overwriting (if necessary)
-        the functions `_train`, `_stop_training`, `_execute` and `_get_supported_dtypes`.
-
-        The '_train' and '_execute' methods receive a parsed input as multiple arguments:
-        (observation array, future observation array, action array, reward array, episode_done array)
-
-        Here is an example to show how the data can be accessed while overwriting the _train method:
-
-        def _train(*args, **kwargs):
-            # phi - current observation 2D array
-            # phi_ - future observation 2D array
-            # a - action 2D array
-            # r - reward 2D array
-            # done - episode done flog 2D array
-            # order consistent with the output data of the OpenAI's GymNode.
-            phi, phi_, a, r, done = args[:5]
-
-            (rest of the code follows here)
+        It provides a '_split_x' method that splits the 2d array to a tuple of arrays
+        (Current observation array, future observation array, action array, reward array,
+        episode_done flag array) for easier access.
 
     """
 
@@ -418,24 +401,24 @@ class RLNode(OnlineNode):
     # properties in addition to the Node properties
     @property
     def observation_dim(self):
-        """Return state dimensions."""
+        """Return state dimensions. Read only."""
         return self._observation_dim
 
     @property
     def action_dim(self):
-        """Return action dimensions."""
+        """Return action dimensions. Read only."""
         return self._action_dim
 
     @property
     def reward_dim(self):
-        """Return reward dimensions."""
+        """Return reward dimensions. Read only."""
         return self._reward_dim
 
     @staticmethod
     def is_invertible():
         return False
 
-    def _split_data_dims(self, x):
+    def _split_x(self, x):
         # split the data dims
         _d = (self.observation_dim * 2 + self.action_dim + self.reward_dim + 1)
         if x.shape[1] < _d:
@@ -452,39 +435,3 @@ class RLNode(OnlineNode):
             start_indx += dims[i]
         return out
 
-    def _get_train_seq(self):
-        def get_train_function():
-            def _train(x, *args, **kwargs):
-                inp = self._split_data_dims(x) + list(args)
-                self._train(*inp, **kwargs)
-
-            return _train
-
-        return [(get_train_function(), self._stop_training, lambda x, *args, **kwargs: x)]
-
-    # Methods to be implemented or overwritten by the user
-
-    def _train(self, *args, **kwargs):
-        if self.is_trainable():
-            raise NotImplementedError
-
-    def _execute(self, *args, **kwargs):
-        return args[0]
-
-    # User interface to the overwritten methods
-
-    def execute(self, x, *args, **kwargs):
-        """Process the data contained in `x`.
-
-        If the object is still in the training phase, the function
-        `stop_training` will be called.
-        `x` is a matrix having different variables on different columns
-        and observations on the rows.
-
-        By default, subclasses should overwrite `_execute` to implement
-        their execution phase. The docstring of the `_execute` method
-        overwrites this docstring.
-        """
-        self._pre_execution_checks(x)
-        inp = self._split_data_dims(self._refcast(x)) + list(args)
-        return self._execute(*inp, **kwargs)
