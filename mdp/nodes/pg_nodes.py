@@ -24,8 +24,8 @@ class PG2DNode(mdp.PreserveDimNode):
     as the output without interfering the flow.
     """
 
-    def __init__(self, use_buffer=False, x_range=None, y_range=None, interval=1, timeout=0,
-                 input_dim=None, output_dim=None, dtype=None):
+    def __init__(self, use_buffer=False, x_range=None, y_range=None, interval=1, timeout=0, window_title=None,
+                 window_size_xy=(640, 480), input_dim=None, output_dim=None, dtype=None):
         """
         user_buffer: If the data arrives sample by sample (like in an OnlineFlow), use_buffer can be set to store
         samples in a circular buffer. At each time-step the buffer contents are displayed.
@@ -43,24 +43,38 @@ class PG2DNode(mdp.PreserveDimNode):
 
         timeout: Sets a minimum of timeout msecs for each plot update. Default is 0.
 
+        window_title: Window title
+
+        window_size: XY size tuple of the window
+
          """
         super(PG2DNode, self).__init__(input_dim, output_dim, dtype)
         self.use_buffer = use_buffer
         self._x_range = x_range
         self._y_range = y_range
-        self.interval = interval
-        self.timeout = timeout
+        self._interval = 1 if interval == -1 else interval
+        self._given_interval = interval
+        self._timeout = timeout
+        self._window_title = window_title
+        self._window_size_xy = window_size_xy
 
-        self._interval = 1 if self.interval == -1 else self.interval
-        self._flow_time = 0
-        self._tlen = 0
-        self._viewer = None
         if use_buffer:
             if x_range is None:
                 raise mdp.NodeException("Provide x_range to init buffer size.")
             self._buffer = mdp.nodes.NumxBufferNode(buffer_size=x_range[1])
+        self._flow_time = 0
+        self._tlen = 0
 
+        # child process that is set upon execution
+        self._viewer = None
+        # queue to communicate data between the main and the child process
         self.new_data = Queue(1)
+
+        # all these variables are set in the child process
+        self._win = None  # pyqtgraph window
+        self._layout = None  # pyqtgraph plots layout
+        self._plot_items = None  # pyqtgraph plot items
+        self._plot_objects = None  # pyqtgraph plot objects (graphics objects)
 
     # properties
 
@@ -127,10 +141,21 @@ class PG2DNode(mdp.PreserveDimNode):
     def __pg_process(self):
         # spawned process
         self.app = QtGui.QApplication([])
-        self._setup_plots()
+        # create and display a plotting window
+        self._win = pg.GraphicsWindow()
+        if self._window_title is None:
+            self._win.setWindowTitle(type(self).__name__)
+        else:
+            self._win.setWindowTitle(self._window_title)
+        self._win.resize(*self._window_size_xy)
+        # get the layout to be displayed in this window
+        self._plot_objects, self._plot_items, self._layout = self._setup_plots()
+        # Set the layout as a central item
+        self._win.setCentralItem(self._layout)
+        self._win.show()
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.__pg_data)
-        self.timer.start(self.timeout)
+        self.timer.start(self._timeout)
         self.app.exec_()
 
     def __pg_data(self):
@@ -152,15 +177,14 @@ class PG2DNode(mdp.PreserveDimNode):
                 return
             time.sleep(0.0001)
         self.new_data.put(x)
+
     # -------------------------------------------
 
     def _setup_plots(self):
         # Setup your plots, layout, etc. Overwrite in the subclass
         # Check PyQtGraph for examples
         # run in shell prompt: python -c "import pyqtgraph.examples; pyqtgraph.examples.run()"
-        self._win = pg.GraphicsWindow()
-        self._win.show()
-        self._win.setWindowTitle("Blank Plot")
+        self._win.setWindowTitle("Uninitialized Blank Plot")
 
     def _update_plots(self, x):
         # Update your individual plotitems. Overwrite in the subclass
@@ -175,10 +199,11 @@ class PG2DNode(mdp.PreserveDimNode):
         if self._tlen % int(self._interval) == 0:
             t = time.time()
             self.__plot(y)
-            _plot_dur = time.time()-t
-            if self.interval == -1:
-                self._interval = self._interval*(100*_plot_dur/_flow_dur +
-                                                 (self._tlen/self._interval-1) * self._interval) / float(self._tlen)
+            _plot_dur = time.time() - t
+            if self._given_interval == -1:
+                self._interval = self._interval * (100 * _plot_dur / _flow_dur +
+                                                   (self._tlen / self._interval - 1) * self._interval) / float(
+                    self._tlen)
                 self._interval = mdp.numx.clip(self._interval, 1, 50)
         self._flow_time = time.time()
         return x
@@ -194,8 +219,10 @@ class PGCurveNode(PG2DNode):
     """ PGCurveNode is a PG2DNode that displays the input data as multiple curves.
         use_buffer needs to be set if the data arrives sample by sample.
     """
-    def __init__(self, display_dims=None, split_figs=False, titles=None, window_size_xy=(640, 480), use_buffer=False,
-                 x_range=None, y_range=None, interval=1, timeout=0, input_dim=None, output_dim=None, dtype=None):
+
+    def __init__(self, display_dims=None, split_figs=False, plot_titles=None, use_buffer=False, x_range=None,
+                 y_range=None, interval=1, timeout=0, window_title=None, window_size_xy=(640, 480), input_dim=None,
+                 output_dim=None, dtype=None):
         """
         display_dims: Dimensions that are displayed in the plots. By default all dimensions are displayed.
                       Accepted values: scalar/list/array - displays the provided dimensions
@@ -203,13 +230,12 @@ class PGCurveNode(PG2DNode):
         split_figs: When set, each data dimension is plotted in a separate figure, otherwise they are vertically stacked
         in a single plot.
 
-        titles: A string or a list of title strings for each plot if split_figs is set to True.
-
-        window_size_xy: Window size (x,y) tuple
+        plot_titles: A string or a list of title strings for each plot if split_figs is set to True.
 
         """
         super(PGCurveNode, self).__init__(use_buffer=use_buffer, x_range=x_range, y_range=y_range, interval=interval,
-                                          timeout=timeout, input_dim=input_dim, output_dim=output_dim, dtype=dtype)
+                                          timeout=timeout, window_title=window_title, window_size_xy=window_size_xy,
+                                          input_dim=input_dim, output_dim=output_dim, dtype=dtype)
 
         if display_dims is not None:
             if mdp.numx.isscalar(display_dims):
@@ -218,88 +244,75 @@ class PGCurveNode(PG2DNode):
         self.display_dims = display_dims
 
         self._split_figs = split_figs
+        self._plot_titles = [] if plot_titles is None else plot_titles
 
-        if titles is None:
-            titles = ['']
-        self._titles = titles
-        self._window_size_xy = window_size_xy
+    def _set_input_dim(self, n):
+        self._input_dim = n
+        if self.display_dims is None:
+            self.display_dims = range(n)
 
     def _setup_plots(self):
-        self._win = pg.GraphicsWindow()
-        self._win.resize(*self._window_size_xy)
-        self._win.show()
-        self._win.setWindowTitle(type(self).__name__)
-
-        pg.setConfigOptions(antialias=True)
-
-        # Main layout
-        self._layout = pg.GraphicsLayout()
-
-        # Set the layout as a central item
-        self._win.setCentralItem(self._layout)
-
-        if self.display_dims is None:
-            self.display_dims = range(0, self.input_dim)
-
+        layout = pg.GraphicsLayout()
         n_disp_dims = len(self.display_dims)
-
-        self._curves = [pg.PlotCurveItem(pen=(i, n_disp_dims*1.3)) for i in xrange(n_disp_dims)]
-        self._plotitems = [pg.PlotItem() for _ in xrange(n_disp_dims)]
+        plot_items = [pg.PlotItem() for _ in xrange(n_disp_dims)]
+        curves = [pg.PlotCurveItem(pen=(i, n_disp_dims * 1.3)) for i in xrange(n_disp_dims)]
+        plot_objects = {'curves': curves}
         if self._split_figs:
             num_rows = mdp.numx.ceil(mdp.numx.sqrt(n_disp_dims))
             for i in xrange(n_disp_dims):
-                self._plotitems[i].addItem(self._curves[i])
-                self._layout.addItem(self._plotitems[i], row=i / num_rows, col=i % num_rows)
+                plot_items[i].addItem(curves[i])
+                layout.addItem(plot_items[i], row=i / num_rows, col=i % num_rows)
                 if self.y_range is not None:
-                    self._plotitems[i].setYRange(*self.y_range)
+                    plot_items[i].setYRange(*self.y_range)
                 if self.x_range is not None:
-                    self._plotitems[i].setXRange(*self.x_range)
-                if i < len(self._titles):
-                    self._plotitems[i].setTitle(self._titles[i])
-
+                    plot_items[i].setXRange(*self.x_range)
+                if i < len(self._plot_titles):
+                    plot_items[i].setTitle(self._plot_titles[i])
         else:
-            self._plotitems = self._plotitems[0]
-            if isinstance(self._titles, (tuple, list)):
-                self._plotitems.setTitle(self._titles[0])
-            elif isinstance(self._titles, str):
-                self._plotitems.setTitle(self._titles)
+            plot_items = plot_items[0]
+            if isinstance(self._plot_titles, (tuple, list)):
+                if len(self._plot_titles) > 0:
+                    plot_items.setTitle(self._plot_titles[0])
+            elif isinstance(self._plot_titles, str):
+                plot_items.setTitle(self._plot_titles)
             for i in xrange(n_disp_dims):
-                self._plotitems.addItem(self._curves[i])
+                plot_items.addItem(curves[i])
                 if self.y_range is None:
-                    self._curves[i].setPos(0, (i + 1) * 6)
-                    self._plotitems.setYRange(0, (n_disp_dims + 1) * 6)
+                    curves[i].setPos(0, (i + 1) * 6)
+                    plot_items.setYRange(0, (n_disp_dims + 1) * 6)
                 else:
-                    self._curves[i].setPos(0, (i + 1) * (self.y_range[1]-self.y_range[0]))
-                    self._plotitems.setYRange(0, (n_disp_dims + 1) * (self.y_range[1]-self.y_range[0]))
+                    curves[i].setPos(0, (i + 1) * (self.y_range[1] - self.y_range[0]))
+                    plot_items.setYRange(0, (n_disp_dims + 1) * (self.y_range[1] - self.y_range[0]))
             if self.x_range is not None:
-                self._plotitems.setXRange(*self.x_range)
+                plot_items.setXRange(*self.x_range)
+            layout.addItem(plot_items)
 
-            self._layout.addItem(self._plotitems)
+        return plot_objects, plot_items, layout
 
     def _update_plots(self, x):
         x = x[:, self.display_dims]
         for i in xrange(x.shape[1]):
-            self._curves[i].setData(x[:, i])
+            self._plot_objects['curves'][i].setData(x[:, i])
 
 
 class PGImageNode(PG2DNode):
     """ PGImageNode is a PG2DNode that displays the input data as an Image."""
-    def __init__(self, img_shapes, display_dims=None, titles=None, window_size_xy=(640, 480), cmap=None, origin='upper',
-                 axis_order='row-major', interval=1, timeout=0, input_dim=None, output_dim=None, dtype=None):
+
+    def __init__(self, img_shapes, display_dims=None, plot_titles=None, cmap=None, origin='upper',
+                 axis_order='row-major', interval=1, timeout=0, window_title=None, window_size_xy=(640, 480),
+                 input_dim=None, output_dim=None, dtype=None):
         """
         img_shapes: 2D or 3D shape tuples of each image that is displayed. It is used to reshape the 2D input data.
                    Accepted values: A single tuple - A single image.
                                     A list of tuples - Each shape tuple is used to reshape the corresponding image.
         
-        titles: A string or a list of title strings for each plot
-
-        window_size_xy: Window size (x,y) tuple
-
         display_dims: Dimensions that are displayed in the plots. By default all dimensions are displayed as a single
                       image plot.
                       Accepted values: list/array - displays the provided dimensions
                                       A list of lists/arrays - display each list/array of dimensions in an
                                                                 individual plot
+
+        plot_titles: A string or a list of title strings for each plot
 
         cmap: Color map to use. Supported: Matplotlib color maps - 'jet', 'gray', etc.
 
@@ -313,7 +326,8 @@ class PGImageNode(PG2DNode):
 
          """
         super(PGImageNode, self).__init__(use_buffer=False, x_range=None, y_range=None, interval=interval,
-                                          timeout=timeout, input_dim=input_dim, output_dim=output_dim, dtype=dtype)
+                                          timeout=timeout, window_title=window_title, window_size_xy=window_size_xy,
+                                          input_dim=input_dim, output_dim=output_dim, dtype=dtype)
 
         # check img_shapes
         if isinstance(img_shapes, tuple):
@@ -360,20 +374,17 @@ class PGImageNode(PG2DNode):
 
         self.display_dims = display_dims
 
-        # check titles
-        if titles is None:
-            titles = ['']
-        if isinstance(titles, str):
-            titles = [titles]
-        elif isinstance(titles, list):
-            for i, title in enumerate(titles):
+        # check plot_titles
+        if plot_titles is None:
+            plot_titles = []
+        if isinstance(plot_titles, str):
+            plot_titles = [plot_titles]
+        elif isinstance(plot_titles, list):
+            for i, title in enumerate(plot_titles):
                 if not isinstance(title, str):
-                    raise mdp.NodeException("'titles should either be a string or a list of strings. "
+                    raise mdp.NodeException("'plot_titles should either be a string or a list of strings. "
                                             " The %d'th element of the given list is of type %s" % (i, type(title)))
-        self._titles = titles
-
-        # window size
-        self._window_size_xy = window_size_xy
+        self._plot_titles = plot_titles
 
         # color map
         self.cmap = cmap
@@ -390,38 +401,27 @@ class PGImageNode(PG2DNode):
         self.axis_order = axis_order
 
     def _setup_plots(self):
-        self._win = pg.GraphicsWindow()
-        self._win.resize(*self._window_size_xy)
-        self._win.show()
-        self._win.setWindowTitle(type(self).__name__)
-
-        pg.setConfigOptions(antialias=True)
-        pg.setConfigOptions(imageAxisOrder=self.axis_order)
-
-        # Main layout
-        self._layout = pg.GraphicsLayout()
-
-        # Set the layout as a central item
-        self._win.setCentralItem(self._layout)
-
-        self._plotitems = []
-        self._imgs = []
+        layout = pg.GraphicsLayout()
+        plot_items = []
+        plot_objects = {'imgs':[]}
 
         num_rows = mdp.numx.ceil(mdp.numx.sqrt(self._n_plots))
         for i in xrange(self._n_plots):
             p = pg.PlotItem()
-            img = pg.ImageItem(border='w', lut=self._get_pglut(self.cmap))
+            img = pg.ImageItem(border='w', lut=self._get_pglut(self.cmap), axisOrder=self.axis_order)
             p.addItem(img)
             # hide axis and set title
             for axis in ['left', 'bottom', 'top', 'right']:
                 p.hideAxis(axis)
-            if i < len(self._titles):
-                p.setTitle(self._titles[i])
+            if i < len(self._plot_titles):
+                p.setTitle(self._plot_titles[i])
             # add to the layout
-            self._layout.addItem(p, row=i / num_rows, col=i % num_rows)
+            layout.addItem(p, row=i / num_rows, col=i % num_rows)
             # store the items
-            self._plotitems.append(p)
-            self._imgs.append(img)
+            plot_items.append(p)
+            plot_objects['imgs'].append(img)
+
+        return plot_objects, plot_items, layout
 
     def _update_plots(self, x):
         for i in xrange(self._n_plots):
@@ -431,7 +431,7 @@ class PGImageNode(PG2DNode):
                     img = img[::-1]
                 elif self.axis_order == 'col-major':
                     img = img[:, ::-1]
-            self._imgs[i].setImage(img)
+            self._plot_objects['imgs'][i].setImage(img)
 
     def _execute(self, x):
         for i in xrange(x.shape[0]):
