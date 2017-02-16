@@ -31,8 +31,11 @@ class BasisFunctionNode(mdp.Node):
         lims - a tuple of lower and upper bounds for each dimension of the input.
                 Eg., [(lower1, lower2, ...,), (upper1, upper2, ...,)]
 
-        order - order of the basis functions. A value that determines the approximation error.
+        order - order of the basis functions. A value that determines the dimensionality of the space
+                that the basis spans.
                         Eg., order 4 of polynomial basis translates x to [1, x, x^2, x^3]
+                        Eg., order 30 of LEMs return top 30 laplacian eigen-maps excluding the constant function.
+                        Note that the first basis function (a constant function) for LEM and GSFA is filtered out.
 
         decoupled - When True, basis functions do not include combinations of the input dims.
                         Eg., order 3 of polynomial basis translates x to [1, x, x^2, y, y^2]
@@ -138,7 +141,7 @@ class BasisFunctionNode(mdp.Node):
             self._output_dim = int(self.order)
             self._L = self._get_laplacian(self._adj)
             [w, v] = eigh(self._L)
-            self.v = v[mdp.numx.argsort(w)][:, :self._output_dim]
+            self.v = v[mdp.numx.argsort(w)][:, 1:self._output_dim + 1]
 
         elif self.basis_name is 'gsfa':
             opt_args = ['adjacency', 'degree', 'n_layers', 'n_poly']
@@ -225,7 +228,7 @@ class BasisFunctionNode(mdp.Node):
         for layernum in xrange(self._nlayers):
             z = self.fa[layernum](x)
             if layernum == self._nlayers - 1:
-                x = mult(z, self.v[layernum][:, :self.output_dim])
+                x = mult(z, self.v[layernum][:, 1:self.output_dim + 1])
             else:
                 x = mult(z, self.v[layernum][:, :self._npoly])
         return x
