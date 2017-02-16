@@ -277,12 +277,17 @@ class PGCurveNode(PG2DNode):
                 plot_items.setTitle(self._plot_titles)
             for i in xrange(n_disp_dims):
                 plot_items.addItem(curves[i])
-                if self.y_range is None:
-                    curves[i].setPos(0, (i + 1) * 6)
-                    plot_items.setYRange(0, (n_disp_dims + 1) * 6)
+                if n_disp_dims > 1:
+                    if self.y_range is None:
+                        curves[i].setPos(0, (i + 1) * 6)
+                        plot_items.setYRange(0, (n_disp_dims + 1) * 6)
+                    else:
+                        curves[i].setPos(0, (i + 1) * (self.y_range[1] - self.y_range[0]))
+                        plot_items.setYRange(0, (n_disp_dims + 1) * (self.y_range[1] - self.y_range[0]))
                 else:
-                    curves[i].setPos(0, (i + 1) * (self.y_range[1] - self.y_range[0]))
-                    plot_items.setYRange(0, (n_disp_dims + 1) * (self.y_range[1] - self.y_range[0]))
+                    if self.y_range is not None:
+                        plot_items.setYRange(*self.y_range)
+
             if self.x_range is not None:
                 plot_items.setXRange(*self.x_range)
             layout.addItem(plot_items)
