@@ -173,8 +173,8 @@ class CircularOnlineFlowNode(FlowNode, mdp.OnlineNode):
         # set training type
         self._set_training_type_from_flow(flow)
         # get stored_input, flow_iterations and ignore_input flags from flow
-        self._flow_iterations = flow._flow_iterations()
-        self._ignore_input = flow.get_ignore_input
+        self._flow_iterations = flow._flow_iterations
+        self._ignore_input = flow._ignore_input
         self._stored_input = flow._stored_input
 
     def set_stored_input(self, x):

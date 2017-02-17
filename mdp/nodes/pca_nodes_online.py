@@ -199,11 +199,6 @@ class CCIPCAWhiteningNode(CCIPCANode):
     """
     __doc__ = __doc__ + "\t" + "#" * 30 + CCIPCANode.__doc__
 
-    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None,
-                 amn_params=(20, 200, 2000, 3), init_eigen_vectors=None, var_rel=1):
-        super(CCIPCAWhiteningNode, self).__init__(input_dim, output_dim, dtype, numx_rng,
-                                                  amn_params, init_eigen_vectors, var_rel)
-
     def _train(self, x):
         """Updates whitening vectors."""
         super(CCIPCAWhiteningNode, self)._train(x)

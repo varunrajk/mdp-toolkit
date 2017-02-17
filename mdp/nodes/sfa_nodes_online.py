@@ -53,14 +53,15 @@ class IncSFANode(mdp.OnlineNode):
 
         """
 
-        self.whiteningnode = WhiteningNode(input_dim=input_dim, output_dim=whitening_output_dim,
-                                           dtype=dtype, numx_rng=numx_rng, init_eigen_vectors=init_pca_vectors,
-                                           amn_params=amn_params)
-        self.tdiffnode = OnlineTimeDiffNode(numx_rng=numx_rng, dtype=dtype)
-        self.mcanode = MCANode(input_dim=whitening_output_dim, output_dim=output_dim,
-                               dtype=dtype, numx_rng=numx_rng, init_eigen_vectors=init_mca_vectors, eps=eps)
+        self.whiteningnode = WhiteningNode(amn_params=amn_params, init_eigen_vectors=init_pca_vectors,
+                                           input_dim=input_dim, output_dim=whitening_output_dim, dtype=dtype,
+                                           numx_rng=numx_rng,)
+        self.tdiffnode = OnlineTimeDiffNode(dtype=dtype, numx_rng=numx_rng)
+
+        self.mcanode = MCANode(eps=eps, init_eigen_vectors=init_mca_vectors, input_dim=whitening_output_dim,
+                               output_dim=output_dim, dtype=dtype, numx_rng=numx_rng)
         if remove_mean:
-            self.avgnode = OnlineCenteringNode(numx_rng=numx_rng, avg_n=avg_n, dtype=dtype)
+            self.avgnode = OnlineCenteringNode(avg_n=avg_n, dtype=dtype, numx_rng=numx_rng)
 
         self.eps = eps
         self.whitening_output_dim = whitening_output_dim
