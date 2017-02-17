@@ -672,6 +672,3 @@ class CheckpointSaveFunction(CheckpointFunction):
             if self.stop_training:
                 node.stop_training()
             _cPickle.dump(node, fid, self.proto)
-
-
-

@@ -12,6 +12,7 @@ class OnlineNodeException(NodeException):
 
 
 class OnlineNode(Node):
+
     """An online Node (OnlineNode) is the basic building block of
         an online MDP application.
 
@@ -121,7 +122,7 @@ class OnlineNode(Node):
             self._training_type = training_type
         else:
             raise OnlineNodeException("Unknown training type specified %s. Supported types "
-                                      "%s" % str(self._get_supported_training_types()))
+                                      "%s" % (str(training_type), str(self._get_supported_training_types())))
 
     # Each element in the _train_seq contains three sub elements
     # (training-phase, stop-training-phase, execution-phase)

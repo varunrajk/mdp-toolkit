@@ -5,8 +5,8 @@ from past.utils import old_div
 
 class MCANode(mdp.OnlineNode):
     """
-    Minor Component Analysis (MCA) extracts minor components from the
-    input data incrementally. More information about MCA can be found in
+    Minor Component Analysis (MCA) extracts minor components (dual of principal
+    components) from the input data incrementally. More information about MCA can be found in
     Peng, D. and Yi, Z, A new algorithm for sequential minor component analysis,
     International Journal of Computational Intelligence Research,
     2(2):207--215, 2006.
@@ -23,8 +23,8 @@ class MCANode(mdp.OnlineNode):
 
     """
 
-    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None, eps=0.1, gamma=1.0,
-                 normalize=True, init_eigen_vectors=None):
+    def __init__(self, eps=0.1, gamma=1.0, normalize=True, init_eigen_vectors=None, input_dim=None, output_dim=None,
+                 dtype=None, numx_rng=None):
         """
         eps: Learning rate (default: 0.1)
 
@@ -47,10 +47,12 @@ class MCANode(mdp.OnlineNode):
 
     @property
     def init_eigen_vectors(self):
+        """Return initialized eigen vectors (minor components)"""
         return self._init_v
 
     @init_eigen_vectors.setter
     def init_eigen_vectors(self, init_eigen_vectors=None):
+        """Set initial eigen vectors (minor components)"""
         self._init_v = init_eigen_vectors
         if self._input_dim is None:
             self._input_dim = self._init_v.shape[0]
@@ -73,6 +75,7 @@ class MCANode(mdp.OnlineNode):
             self.d = mdp.numx_linalg.norm(self.v, axis=0)
 
     def _check_params(self, *args):
+        """Initialize parameters"""
         if self._init_v is None:
             if self.output_dim is not None:
                 self.init_eigen_vectors = 0.1 * self.numx_rng.randn(self.input_dim, self.output_dim).astype(self.dtype)
@@ -80,6 +83,7 @@ class MCANode(mdp.OnlineNode):
                 self.init_eigen_vectors = 0.1 * self.numx_rng.randn(self.input_dim, self.input_dim).astype(self.dtype)
 
     def _train(self, x):
+        """Update the minor components."""
         c = mult(x.T, x)
         for j in xrange(self.output_dim):
             v = self.v[:, j:j + 1]
@@ -148,5 +152,5 @@ class MCANode(mdp.OnlineNode):
         gamma = "gamma=%s" % str(self.gamma)
         normalize = "normalize=%s" % str(self.normalize)
         init_eig_vecs = "init_eigen_vectors=%s" % str(self.init_eigen_vectors)
-        args = ', '.join((inp, out, typ, numx_rng, eps, gamma, normalize, init_eig_vecs))
+        args = ', '.join((eps, gamma, normalize, init_eig_vecs, inp, out, typ, numx_rng))
         return name + '(' + args + ')'

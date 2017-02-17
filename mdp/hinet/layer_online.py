@@ -9,17 +9,20 @@ class OnlineLayer(Layer, mdp.OnlineNode):
     """OnlineLayers are nodes which consist of multiple horizontally parallel OnlineNodes.
     OnlineLayer also supports trained or non-trainable Nodes.
 
+    Reference:
+    A trained Node: node.is_trainable() returns True, node.is_training() returns False.
+    A non-trainable Node: node.is_trainable() returns False, node.is_training() returns False.
+
     The incoming data is split up according to the dimensions of the internal
     nodes. For example if the first node has an input_dim of 50 and the second
     node 100 then the layer will have an input_dim of 150. The first node gets
     x[:,:50], the second one x[:,50:].
 
     Any additional arguments are forwarded unaltered to each node.
-    Warning: This might change in the next release (2.5).
 
     Since they are nodes themselves layers can be stacked in a flow (e.g. to
     build a layered network). If one would like to use flows instead of nodes
-    inside of a layer one can use an OnlineFlowNode.
+    inside of a layer one can use flownodes.
     """
     def __init__(self, nodes, dtype=None, numx_rng=None):
         """Setup the layer with the given list of nodes.
@@ -41,28 +44,41 @@ class OnlineLayer(Layer, mdp.OnlineNode):
     def _check_compatibility(self, nodes):
         [self._check_value_type_is_compatible(item) for item in nodes]
 
-    def _check_value_type_is_compatible(self, value):
+    @staticmethod
+    def _check_value_type_is_compatible(value):
         # onlinenodes, trained and non-trainable nodes are compatible
         if not isinstance(value, mdp.Node):
             raise TypeError("'nodes' item must be a Node instance and not %s"%(type(value)))
         elif isinstance(value, mdp.OnlineNode):
             pass
         else:
-            # classic mdp Node
-            if value.is_training():
+            # Node
+            if not value.is_training():
+                # trained or non-trainable node
+                pass
+            else:
                 raise TypeError("'nodes' item must either be an OnlineNode, a trained or a non-trainable Node.")
 
+
     def _set_training_type_from_nodes(self, nodes):
+        # the training type is set to batch if there is at least one node with the batch training type.
+        self._training_type = None
         for node in nodes:
-            if hasattr(node, 'training_type') and (node.training_type == 'incremental'):
-                self._training_type = 'incremental'
+            if hasattr(node, 'training_type') and (node.training_type == 'batch'):
+                self._training_type = 'batch'
                 return
-        self._training_type = 'batch'
 
     def set_training_type(self, training_type):
-        if self.training_type != training_type:
-            raise mdp.NodeException("Cannot change the training type to %s. It is inferred from "
-                                    "the nodes and is set to '%s'. "%(training_type, self.training_type))
+        """Sets the training type"""
+        if self.training_type is None:
+            if training_type in self._get_supported_training_types():
+                self._training_type = training_type
+            else:
+                raise mdp.OnlineNodeException("Unknown training type specified %s. Supported types "
+                                              "%s" % (str(training_type), str(self._get_supported_training_types())))
+        elif self.training_type != training_type:
+            raise mdp.OnlineNodeException("Cannot change the training type to %s. It is inferred from "
+                                          "the nodes and is set to '%s'. " % (training_type, self.training_type))
 
     def _set_numx_rng(self, rng):
         # set the numx_rng for all the nodes to be the same.
@@ -83,11 +99,11 @@ class CloneOnlineLayer(CloneLayer, OnlineLayer):
     """OnlineLayer with a single node instance that is used multiple times.
 
     The same single node instance is used to build the layer, so
-    CloneIlayer(node, 3) executes in the same way as OnlineLayer([node]*3).
+    CloneOnlineLayer(node, 3) executes in the same way as OnlineLayer([node]*3).
     But OnlineLayer([node]*3) would have a problem when closing a training phase,
     so one has to use CloneOnlineLayer.
 
-    An CloneOnlineLayer can be used for weight sharing in the training phase. It might
+    An CloneOnlineLayer can be used for weight sharing in the training phase, it might
     be also useful for reducing the memory footprint use during the execution
     phase (since only a single node instance is needed).
     """

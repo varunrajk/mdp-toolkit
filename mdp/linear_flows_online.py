@@ -414,8 +414,9 @@ class CircularOnlineFlow(OnlineFlow):
         self._ignore_input = False
 
     def set_stored_input(self, x):
-        # CircularOnlineFlow also supports training nodes while ignoring external input data at all times.
-        # In this case, the flow iterates everytime using an initially stored input that can be set using this method.
+        """CircularOnlineFlow also supports training nodes while ignoring external input data at all times.
+        In this case, the flow iterates every time using an initially stored input that can be set using this method.
+        """
         if self.flow[0].input_dim is not None:
             if x.shape[-1] != self.flow[0].input_dim:
                 raise CircularOnlineFlowException(
@@ -423,21 +424,23 @@ class CircularOnlineFlow(OnlineFlow):
             self._stored_input = x
 
     def get_stored_input(self):
-        # returns the current stored input.
+        """return the current stored input"""
         return self._stored_input
 
     def ignore_input(self, flag):
-        # CircularOnlineFlow also supports training nodes while ignoring external input data at all times.
-        # This mode is enabled/disabled using this method.
-        # See train method docstring for information on different training modes.
+        """ CircularOnlineFlow also supports training nodes while ignoring external input data at all times.
+        This mode is enabled/disabled using this method. See train method docstring for information on
+        different training modes.
+        """
         self._ignore_input = flag
 
     def set_flow_iterations(self, n):
-        # This method sets the number of total flow iterations:
-        # If self._ignore_input is False, then total flow iterations = 1 external + (n-1) internal iterations.
-        # if self._ignore input is True, then total flow iterations = n internal iterations.
-        # See train method docstring for information on different training modes.
-        self._flow_iterations = int(n)
+        """This method sets the number of total flow iterations:
+        If self._ignore_input is False, then the total flow iterations = 1 external + (n-1) internal iterations.
+        If self._ignore input is True, then the total flow iterations = n internal iterations.
+        See train method docstring for information on different training modes.
+        """
+        self._flow_iterations = n
 
     def _train_nodes(self, data_iterables):
         for x in data_iterables:
@@ -542,6 +545,7 @@ class CircularOnlineFlow(OnlineFlow):
         return x
 
     def set_input_node(self, node_idx):
+        """Set the input node of the flow"""
         if (node_idx > len(self.flow)) or (node_idx < 0):
             raise CircularOnlineFlowException(
                 "Accepted 'node_idx' values: 0 <= node_idx < %d, given %d" % (len(self.flow), node_idx))
@@ -549,6 +553,7 @@ class CircularOnlineFlow(OnlineFlow):
         self.output_node_idx = (self.output_node_idx - node_idx) % len(self.flow)
 
     def set_output_node(self, node_idx):
+        """Set the output node of the flow"""
         if (node_idx > len(self.flow)) or (node_idx < 0):
             raise CircularOnlineFlowException(
                 "Accepted 'node_idx' values: 0 <= node_idx < %d, given %d" % (len(self.flow), node_idx))
@@ -558,6 +563,7 @@ class CircularOnlineFlow(OnlineFlow):
         [self._check_value_type_is_online_or_nontrainable_node(item) for item in flow]
 
     def reset_output_node(self):
+        """Resets the output node to the last node of the provided node sequence"""
         self.output_node_idx = len(self.flow) - 1
 
     # private container methods

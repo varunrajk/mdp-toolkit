@@ -23,8 +23,8 @@ class CCIPCANode(mdp.OnlineNode):
 
     """
 
-    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None,
-                 amn_params=(20, 200, 2000, 3), init_eigen_vectors=None, var_rel=1):
+    def __init__(self, amn_params=(20, 200, 2000, 3), init_eigen_vectors=None, var_rel=1, input_dim=None,
+                 output_dim=None, dtype=None, numx_rng=None):
         """
         amn_params: Amnesic parameters. Default set to (n1=20,n2=200,m=2000,c=3).
                             For n < n1, ~ moving average.
@@ -52,10 +52,12 @@ class CCIPCANode(mdp.OnlineNode):
 
     @property
     def init_eigen_vectors(self):
+        """Return initialized eigen vectors (principal components)"""
         return self._init_v
 
     @init_eigen_vectors.setter
     def init_eigen_vectors(self, init_eigen_vectors=None):
+        """Set initial eigen vectors (principal components)"""
         self._init_v = init_eigen_vectors
         if self._input_dim is None:
             self._input_dim = self._init_v.shape[0]
@@ -75,6 +77,7 @@ class CCIPCANode(mdp.OnlineNode):
             self.v = old_div(self._v, self.d)
 
     def _check_params(self, *args):
+        """Initialize parameters"""
         if self._init_v is None:
             if self.output_dim is not None:
                 self.init_eigen_vectors = 0.1 * self.numx_rng.randn(self.input_dim, self.output_dim).astype(self.dtype)
@@ -82,6 +85,7 @@ class CCIPCANode(mdp.OnlineNode):
                 self.init_eigen_vectors = 0.1 * self.numx_rng.randn(self.input_dim, self.input_dim).astype(self.dtype)
 
     def _amnesic(self, n):
+        """Return amnesic weights"""
         _i = float(n + 1)
         n1, n2, m, c = self.amn_params
         if _i < n1:
@@ -95,6 +99,7 @@ class CCIPCANode(mdp.OnlineNode):
         return [_wold, _wnew]
 
     def _train(self, x):
+        """Update the principal components."""
         [w1, w2] = self._amnesic(self.get_current_train_iteration() + 1)
         red_j = self.output_dim
         red_j_flag = False
@@ -182,7 +187,7 @@ class CCIPCANode(mdp.OnlineNode):
         amn = "\namn_params=%s" % str(self.amn_params)
         init_eig_vecs = "init_eigen_vectors=%s" % str(self.init_eigen_vectors)
         var_rel = "var_rel=%s" % str(self.var_rel)
-        args = ', '.join((inp, out, typ, numx_rng, amn, init_eig_vecs, var_rel))
+        args = ', '.join((amn, init_eig_vecs, var_rel, inp, out, typ, numx_rng))
         return name + '(' + args + ')'
 
 
@@ -200,6 +205,7 @@ class CCIPCAWhiteningNode(CCIPCANode):
                                                   amn_params, init_eigen_vectors, var_rel)
 
     def _train(self, x):
+        """Updates whitening vectors."""
         super(CCIPCAWhiteningNode, self)._train(x)
         self.v = old_div(self.v, mdp.numx.sqrt(self.d))
 

@@ -28,9 +28,9 @@ class IncSFANode(mdp.OnlineNode):
 
     """
 
-    def __init__(self, input_dim=None, output_dim=None, dtype=None, numx_rng=None, eps=0.05,
-                 whitening_output_dim=None, remove_mean=True, avg_n=None, amn_params=(20, 200, 2000, 3),
-                 init_pca_vectors=None, init_mca_vectors=None):
+    def __init__(self, eps=0.05, whitening_output_dim=None, remove_mean=True, avg_n=None, amn_params=(20, 200, 2000, 3),
+                 init_pca_vectors=None, init_mca_vectors=None, input_dim=None, output_dim=None, dtype=None,
+                 numx_rng=None):
         """
         eps: Learning rate (default: 0.1)
 
@@ -92,6 +92,7 @@ class IncSFANode(mdp.OnlineNode):
             self.avgnode.dtype = t
 
     def _set_numx_rng(self, rng):
+        # set a shared numx rng
         self._numx_rng = rng
         self.whiteningnode.numx_rng = rng
         self.tdiffnode.numx_rng = rng
@@ -101,17 +102,21 @@ class IncSFANode(mdp.OnlineNode):
 
     @property
     def init_slow_features(self):
+        """Return initialized slow features"""
         return self._init_sf
 
     @property
     def init_pca_vectors(self):
+        """Return initialized whitening vectors"""
         return self.whiteningnode.init_eigen_vectors
 
     @property
     def init_mca_vectors(self):
+        """Return initialized minor components"""
         return self.mcanode.init_eigen_vectors
 
     def _check_params(self, x):
+        """Initialize parameters"""
         if self._init_sf is None:
             if self.remove_mean:
                 self._pseudo_check_fn(self.avgnode, x)
@@ -170,6 +175,9 @@ class IncSFANode(mdp.OnlineNode):
         return sf_change
 
     def _train(self, x, new_episode=None):
+        """Update slow features.
+        Set new_episode to True to ignore taking erroneous derivatives between the episodes of
+        training data."""
         sf_change = 0.0
         if self.training_type == 'batch':
             self._new_episode = True
@@ -185,11 +193,13 @@ class IncSFANode(mdp.OnlineNode):
         self.sf_change = sf_change
 
     def _execute(self, x):
+        """Return slow feature response"""
         if self.remove_mean:
             x = self.avgnode._execute(x)
         return mult(x, self.sf)
 
     def _inverse(self, y):
+        """Return inverse of the slow feature response"""
         return mult(y, pinv(self.sf)) + self.avgnode.avg
 
     def __repr__(self):
@@ -210,5 +220,5 @@ class IncSFANode(mdp.OnlineNode):
         init_pca_vecs = "init_pca_vectors=%s" % str(self.init_pca_vectors)
         init_mca_vecs = "init_pca_vectors=%s" % str(self.init_mca_vectors)
         args = ', '.join(
-            (inp, out, typ, numx_rng, eps, whit_dim, remove_mean, avg_n, amn, init_pca_vecs, init_mca_vecs))
+            (eps, whit_dim, remove_mean, avg_n, amn, init_pca_vecs, init_mca_vecs, inp, out, typ, numx_rng))
         return name + '(' + args + ')'

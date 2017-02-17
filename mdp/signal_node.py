@@ -720,7 +720,6 @@ class Node(with_metaclass(NodeMetaclass, object)):
                 _cPickle.dump(self, flh, protocol)
 
 
-
 class PreserveDimNode(Node):
     """Abstract base class with ``output_dim == input_dim``.
 
