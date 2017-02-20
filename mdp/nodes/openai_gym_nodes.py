@@ -112,7 +112,8 @@ class GymNode(mdp.OnlineNode):
         self.render_interval = render_interval
         self._interval = 1 if self.render_interval == -1 else self.render_interval
         self._flow_time = 0
-        self._tlen = 0
+        self._cnt = 0
+        self._epicnt = 0
 
     # properties
 
@@ -144,15 +145,15 @@ class GymNode(mdp.OnlineNode):
 
     def _render_step(self):
         if self.render:
-            self._tlen += 1
+            self._cnt += 1
             _flow_dur = time.time() - self._flow_time
-            if self._tlen % int(self._interval) == 0:
+            if self._cnt % int(self._interval) == 0:
                 t = time.time()
                 self.env.render()
                 _plot_dur = time.time() - t
                 if self.render_interval == -1:
-                    self._interval *= (100 * _plot_dur / _flow_dur + (self._tlen / self._interval - 1) *
-                                       self._interval) / float(self._tlen)
+                    self._interval *= (100 * _plot_dur / _flow_dur + (self._cnt / self._interval - 1) *
+                                       self._interval) / float(self._cnt)
                     self._interval = mdp.numx.clip(self._interval, 1, 50)
             self._flow_time = time.time()
 
@@ -165,6 +166,7 @@ class GymNode(mdp.OnlineNode):
             self._render_step()
             if self.auto_reset and done:
                 self.env.reset()
+                self._epicnt += 1
             yield phi, a, r, done, info
 
     def _execute(self, x):
@@ -195,6 +197,10 @@ class GymNode(mdp.OnlineNode):
     def get_environment_samples(self, n=1):
         """Returns observations corresponding to the specified number of randomly (uniform) sampled actions."""
         return self.execute(self.get_random_actions(n))
+
+    def get_current_episode(self):
+        """Returns the current epsiode."""
+        return self._epicnt
 
 
 class GymContinuousExplorerNode(GymNode):
@@ -258,6 +264,7 @@ class GymContinuousExplorerNode(GymNode):
             if self.auto_reset and done:
                 self.env.reset()
                 self._a = mdp.numx.zeros(self.action_dim)
+                self._epicnt += 1
             yield phi, a_, r, done, info
 
     def _train(self, x):
