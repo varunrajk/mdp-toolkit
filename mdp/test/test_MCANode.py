@@ -1,15 +1,15 @@
-
 from mdp.nodes import PCANode, WhiteningNode, PolynomialExpansionNode, MCANode
 from ._tools import *
 import time
 
+
 def test_mcanode_v1():
-    line_x = numx.zeros((1000,2),"d")
-    line_y = numx.zeros((1000,2),"d")
-    line_x[:,0] = numx.linspace(-1,1,num=1000,endpoint=1)
-    line_y[:,1] = numx.linspace(-0.2,0.2,num=1000,endpoint=1)
-    mat = numx.concatenate((line_x,line_y))
-    utils.rotate(mat,uniform()*2*numx.pi)
+    line_x = numx.zeros((1000, 2), "d")
+    line_y = numx.zeros((1000, 2), "d")
+    line_x[:, 0] = numx.linspace(-1, 1, num=1000, endpoint=1)
+    line_y[:, 1] = numx.linspace(-0.2, 0.2, num=1000, endpoint=1)
+    mat = numx.concatenate((line_x, line_y))
+    utils.rotate(mat, uniform() * 2 * numx.pi)
     mat += uniform(2)
     mat -= mat.mean(axis=0)
     mca = MCANode()
@@ -21,12 +21,12 @@ def test_mcanode_v1():
     bpca.stop_training()
 
     v = mca.get_projmatrix()
-    bv = bpca.get_projmatrix()[:,::-1]
+    bv = bpca.get_projmatrix()[:, ::-1]
 
     dcosines = numx.zeros(v.shape[1])
     for dim in xrange(v.shape[1]):
-        dcosines[dim] = numx.fabs(numx.dot(v[:,dim], bv[:,dim].T)) / (
-        numx.linalg.norm(v[:,dim]) * numx.linalg.norm(bv[:,dim]))
+        dcosines[dim] = numx.fabs(numx.dot(v[:, dim], bv[:, dim].T)) / (
+            numx.linalg.norm(v[:, dim]) * numx.linalg.norm(bv[:, dim]))
     assert_almost_equal(numx.ones(v.shape[1]), dcosines)
 
 
@@ -49,23 +49,24 @@ def test_mcanode_v2():
 
     bpcanode = PCANode()
     bpcanode(input_data)
-    bv = bpcanode.v / numx.linalg.norm(bpcanode.v, axis=0)
-    bv = bv[:,::-1][:,:output_dim]
+    # bv = bpcanode.v / numx.linalg.norm(bpcanode.v, axis=0)
+    bv = bpcanode.v / mdp.numx.sum(bpcanode.v ** 2, axis=0) ** 0.5
+    bv = bv[:, ::-1][:, :output_dim]
 
     _tcnt = time.time()
 
     v = []
 
-    for i in xrange(iterval*input_data.shape[0]):
-        node.train(input_data[i%input_data.shape[0]:i%input_data.shape[0]+1])
+    for i in xrange(iterval * input_data.shape[0]):
+        node.train(input_data[i % input_data.shape[0]:i % input_data.shape[0] + 1])
         if (node.get_current_train_iteration() % 100 == 0):
             v.append(node.v)
 
     dcosines = numx.zeros([len(v), output_dim])
     for i in xrange(len(v)):
         for dim in xrange(output_dim):
-            dcosines[i, dim] = numx.fabs(numx.dot(v[i][:,dim], bv[:,dim].T)) / (
-            numx.linalg.norm(v[i][:,dim]) * numx.linalg.norm(bv[:,dim]))
+            dcosines[i, dim] = numx.fabs(numx.dot(v[i][:, dim], bv[:, dim].T)) / (
+                numx.linalg.norm(v[i][:, dim]) * numx.linalg.norm(bv[:, dim]))
 
     print
     print 'Total Time for %d iterations: ' % (iterval), time.time() - _tcnt
@@ -73,7 +74,7 @@ def test_mcanode_v2():
 
 
 def test_mcanode_numx_rng():
-    x = mdp.numx_rand.randn(100,5)
+    x = mdp.numx_rand.randn(100, 5)
 
     numx_rng = mdp.numx_rand.RandomState(seed=10)
     node1 = MCANode(numx_rng=numx_rng)
