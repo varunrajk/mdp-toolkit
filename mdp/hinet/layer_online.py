@@ -5,6 +5,7 @@ Module for OnlineLayers.
 import mdp
 from .layer import Layer, CloneLayer, SameInputLayer
 
+
 class OnlineLayer(Layer, mdp.OnlineNode):
     """OnlineLayers are nodes which consist of multiple horizontally parallel OnlineNodes.
     OnlineLayer also supports trained or non-trainable Nodes.
@@ -24,6 +25,7 @@ class OnlineLayer(Layer, mdp.OnlineNode):
     build a layered network). If one would like to use flows instead of nodes
     inside of a layer one can use flownodes.
     """
+
     def __init__(self, nodes, dtype=None, numx_rng=None):
         """Setup the layer with the given list of nodes.
 
@@ -48,7 +50,7 @@ class OnlineLayer(Layer, mdp.OnlineNode):
     def _check_value_type_is_compatible(value):
         # onlinenodes, trained and non-trainable nodes are compatible
         if not isinstance(value, mdp.Node):
-            raise TypeError("'nodes' item must be a Node instance and not %s"%(type(value)))
+            raise TypeError("'nodes' item must be a Node instance and not %s" % (type(value)))
         elif isinstance(value, mdp.OnlineNode):
             pass
         else:
@@ -58,7 +60,6 @@ class OnlineLayer(Layer, mdp.OnlineNode):
                 pass
             else:
                 raise TypeError("'nodes' item must either be an OnlineNode, a trained or a non-trainable Node.")
-
 
     def _set_training_type_from_nodes(self, nodes):
         # the training type is set to batch if there is at least one node with the batch training type.
@@ -92,7 +93,6 @@ class OnlineLayer(Layer, mdp.OnlineNode):
            Use OnlineNode train_seq not Layer's
         """
         return mdp.OnlineNode._get_train_seq(self)
-
 
 
 class CloneOnlineLayer(CloneLayer, OnlineLayer):
@@ -147,4 +147,3 @@ class SameInputOnlineLayer(SameInputLayer, OnlineLayer):
         self.numx_rng = numx_rng
         # set training type
         self._set_training_type_from_nodes(nodes)
-

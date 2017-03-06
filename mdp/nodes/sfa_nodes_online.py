@@ -223,3 +223,4 @@ class IncSFANode(mdp.OnlineNode):
         args = ', '.join(
             (eps, whit_dim, remove_mean, avg_n, amn, init_pca_vecs, init_mca_vecs, inp, out, typ, numx_rng))
         return name + '(' + args + ')'
+

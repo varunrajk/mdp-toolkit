@@ -24,6 +24,8 @@ def get_termsize():
         # Does anyone know how to get the console size under windows?
         # One approach is:
         # http://code.activestate.com/recipes/440694/
+        # PyCharm throws an IOError for ioctl.
+        # Does anyone know how to get the console size in PyCharm?
         height, width = 24, 79
     return height, width
 

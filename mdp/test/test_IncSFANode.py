@@ -1,10 +1,9 @@
-
 from mdp.nodes import PolynomialExpansionNode, SFANode, IncSFANode
 from ._tools import *
 import time
 
-def test_incsfa_v2():
 
+def test_incsfa_v2():
     iterval = 30
     t = numx.linspace(0, 4 * numx.pi, 500)
     x = numx.zeros([t.shape[0], 2])
@@ -24,8 +23,8 @@ def test_incsfa_v2():
     v = []
 
     _tcnt = time.time()
-    for i in xrange(iterval*input_data.shape[0]):
-        node.train(input_data[i%input_data.shape[0]:i%input_data.shape[0]+1])
+    for i in xrange(iterval * input_data.shape[0]):
+        node.train(input_data[i % input_data.shape[0]:i % input_data.shape[0] + 1])
         if (node.get_current_train_iteration() % 100 == 0):
             v.append(node.sf)
 
@@ -35,13 +34,13 @@ def test_incsfa_v2():
     dcosines = numx.zeros([len(v), output_dim])
     for i in xrange(len(v)):
         for dim in xrange(output_dim):
-            dcosines[i, dim] = numx.fabs(numx.dot(v[i][:,dim], bv[:,dim].T)) / (
-            numx.linalg.norm(v[i][:,dim]) * numx.linalg.norm(bv[:,dim]))
+            dcosines[i, dim] = numx.fabs(numx.dot(v[i][:, dim], bv[:, dim].T)) / (
+                numx.linalg.norm(v[i][:, dim]) * numx.linalg.norm(bv[:, dim]))
     assert_almost_equal(numx.ones(output_dim), dcosines[-1], decimal=2)
 
 
 def test_incsfanode_numx_rng():
-    x = mdp.numx_rand.randn(100,5)
+    x = mdp.numx_rand.randn(100, 5)
 
     numx_rng = mdp.numx_rand.RandomState(seed=10)
     node1 = IncSFANode(numx_rng=numx_rng)
