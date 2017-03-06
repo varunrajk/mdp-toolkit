@@ -144,8 +144,8 @@ class GymNode(mdp.OnlineNode):
         return False
 
     def _render_step(self):
+        self._cnt += 1
         if self.render:
-            self._cnt += 1
             _flow_dur = time.time() - self._flow_time
             if self._cnt % int(self._interval) == 0:
                 t = time.time()
@@ -201,6 +201,18 @@ class GymNode(mdp.OnlineNode):
     def get_current_episode(self):
         """Returns the current epsiode."""
         return self._epicnt
+
+    def get_current_iteration(self):
+        """Returns the numbers of environment steps that have been executed so far"""
+        return self._cnt
+
+    def reset(self):
+        """Resets the environment, agent's position, the current iteration count and the epsiode count."""
+        self.env.reset()
+        self._cnt = 0
+        self._epicnt = 0
+        self._interval = 1 if self.render_interval == -1 else self.render_interval
+        self._flow_time = 0
 
 
 class GymContinuousExplorerNode(GymNode):
