@@ -29,6 +29,9 @@ class GymNode(mdp.OnlineNode):
     'get_random_actions' - returns a random set of valid actions
     within the environment.
 
+    'reset' - resets the environment.
+
+
     **Instance variables of interest**
 
       ``self.observation_dim / self.action_dim``
@@ -242,6 +245,7 @@ class GymContinuousExplorerNode(GymNode):
         self._cov = mdp.numx.identity(self.action_dim) if action_std is None else mdp.numx.diag(action_std)
         self._m = action_momentum
         self._a = mdp.numx.zeros(self.action_dim)
+        self._init_epsilon = epsilon
 
     def is_trainable(self):
         return self._is_trainable
@@ -281,3 +285,9 @@ class GymContinuousExplorerNode(GymNode):
 
     def _train(self, x):
         self.epsilon *= self.decay ** x.shape[0]
+
+    def reset(self):
+        """Resets the environment, agent's position, the current iteration count and the epsiode count."""
+        super(GymContinuousExplorerNode, self).reset()
+        self.epsilon = self._init_epsilon
+        self._a = mdp.numx.zeros(self.action_dim)

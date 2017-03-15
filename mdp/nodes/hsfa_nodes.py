@@ -26,7 +26,7 @@ class HSFANode(mdp.Node):
     """
 
     def __init__(self, in_channels_xy, field_channels_xy, field_spacing_xy, n_features, in_channel_dim=1,
-                 n_training_fields=None, field_dstr='uniform', output_dim=None, dtype=None):
+                 n_training_fields=None, field_dstr='uniform', noise_sigma=0.0001, output_dim=None, dtype=None):
         """
         in_channels_xy - (width, height) of the input image
         field_channels_xy - A list of field_channel_xy tuples for each layer
@@ -63,6 +63,9 @@ class HSFANode(mdp.Node):
 
         field_dstr - The type of distribution to use for random sampling. Currently only supports 'uniform'
 
+        noise_sigma - Standard deviation of the additive zero-mean gaussian noise to use to prevent singular value
+                      errors.
+
         """
         super(HSFANode, self).__init__(input_dim=None, output_dim=None, dtype=dtype)
 
@@ -70,12 +73,13 @@ class HSFANode(mdp.Node):
         self.in_channels_xy = in_channels_xy
         self.in_channel_dim = in_channel_dim
         self.field_dstr = field_dstr
+        self.noise_sigma = noise_sigma
 
         self.n_layers = len(field_channels_xy)
         self.field_spacing_xy = self._xy_to_layersxy(field_spacing_xy, 'field_spacing_xy')
         self.n_features = self._x_to_layersx(n_features, 'n_features')
 
-        self._default_net, self._rec_n_training_fields, self._input_shape, self._output_shape = self._init_default_net()
+        self._default_net, self._default_n_training_fields, self._input_shape, self._output_shape = self._init_default_net()
 
         if n_training_fields is None:
             # Random sampling disabled
@@ -90,14 +94,13 @@ class HSFANode(mdp.Node):
                 for _i, _n in enumerate(n_training_fields):
                     if _n == -1:
                         # Automatically set n_training_field equal to the number used in rectangular switchboard.
-                        n_training_fields[_i] = self._rec_n_training_fields[_i]
+                        n_training_fields[_i] = self._default_n_training_fields[_i]
                     elif (0 < _n) and (_n < 1):
                         # set n_training_field equal to the given percentage of the number used
                         # in rectangular switchboard.
-                        n_training_fields[_i] = int(mdp.numx.ceil(_n * self._rec_n_training_fields[_i]))
+                        n_training_fields[_i] = int(mdp.numx.ceil(_n * self._default_n_training_fields[_i]))
 
             self.n_training_fields = self._x_to_layersx(n_training_fields, 'n_training_fields')
-            self._check_n_training_fields()
             self._training_flow = self._init_random_sampling_net()  # not an mdp.Flow
             self._execution_flow = mdp.Flow(self._default_net)
 
@@ -192,14 +195,24 @@ class HSFANode(mdp.Node):
             self.n_training_fields = n_training_fields
             self.field_dstr = self._training_flow[0].flow[0].field_dstr
         self._output_shape = (sb.out_channels_xy[0], sb.out_channels_xy[1], cln.node.output_dim)
-        self._rec_n_training_fields = self._rec_n_training_fields[:self.n_layers]
+        self._default_n_training_fields = self._default_n_training_fields[:self.n_layers]
+        self._set_output_dim(self._output_dim)
 
-    def _check_n_training_fields(self):
-        for i in xrange(len(self._rec_n_training_fields)):
-            if self.n_training_fields[i] > self._rec_n_training_fields[i]:
-                _warnings.warn("\nNumber of training fields (n_training_fields) for layer "
-                               "%d (%d) exceeds the training_fields of a regular rectangular grid (%d)." %
-                               (i, self.n_training_fields[i], self._rec_n_training_fields[i]))
+        # reset train phase
+        train_phase = 0
+        for node in self._execution_flow:
+            if not node.is_training():
+                train_phase += len(node._train_seq)
+            if node.is_training():
+                train_phase += len(node._train_seq) - node.get_remaining_train_phase()
+                break
+        self._train_phase = train_phase
+
+        # check if _training is complete
+        self._training = False
+        for node in self._execution_flow:
+            if node.is_training():
+                self._training = True
 
     def _x_to_layersx(self, x, xname):
         """
@@ -290,32 +303,53 @@ class HSFANode(mdp.Node):
         return False
 
     def _set_output_dim(self, n):
-        self._output_dim = min(mdp.numx.prod(self.output_shape), n)
+        if n is not None:
+            self._output_dim = min(mdp.numx.prod(self.output_shape), n)
 
     def _check_train_args(self, x, *args, **kwargs):
         if self.output_dim is None:
             self._output_dim = mdp.numx.prod(self.output_shape)
 
+    def _update_execution_flow(self, layer_nr):
+        """Updates the flownodes of the execution_flow layer.
+        The node automatically calls this function whenever a training_flow
+        layer has been trained.
+        """
+        if self.n_training_fields is None:
+            return
+
+        nodes = []
+        for node in self._execution_flow[layer_nr].flow:
+            if isinstance(node, mdp.hinet.CloneLayer):
+                cln = mdp.hinet.CloneLayer(node.node, n_nodes=len(node.nodes))
+                nodes.append(cln)
+            else:
+                nodes.append(node)
+        self._execution_flow[layer_nr] = mdp.hinet.FlowNode(mdp.Flow(nodes), dtype=self.dtype)
+
     def _get_train_seq(self):
         """Return a training sequence containing all training phases."""
 
-        def get_train_function(_i_node, _node):
-            # This internal function is needed to channel the data through
-            # the nodes in front of the current nodes.
-            # using nested scopes here instead of default args, see pep-0227
+        def get_train_function(_i_node, _node, noise_sigma):
             def _train(x, *args, **kwargs):
                 if _i_node > 0:
                     x = self._execution_flow.execute(x, nodenr=_i_node - 1)
-                _node.train(x + 0.0001 * mdp.numx_rand.randn(*x.shape), *args, **kwargs)
+                _node.train(x + noise_sigma * mdp.numx_rand.randn(*x.shape), *args, **kwargs)
 
             return _train
+
+        def get_stop_training_wrapper(_i_node):
+            def _stop_training(*args, **kwargs):
+                self._training_flow[_i_node].stop_training(*args, **kwargs)
+                self._update_execution_flow(_i_node)
+            return _stop_training
 
         train_seq = []
         for i_node, node in enumerate(self._training_flow):
             if node.is_trainable():
                 remaining_len = len(node._get_train_seq())
-                train_seq += ([(get_train_function(i_node, node),
-                                node.stop_training)] * remaining_len)
+                train_seq += ([(get_train_function(i_node, node, self.noise_sigma),
+                                get_stop_training_wrapper(i_node))] * remaining_len)
         return train_seq
 
     def _execute(self, x, n=None):
@@ -348,7 +382,8 @@ class HSFANode(mdp.Node):
         hinet_dims += "]"
         netstr += hinet_dims + layer_input_shapes
         netstr += "\nnum_training_fields=%s, " % str(self.n_training_fields)
-        netstr += "recommended_min=%s" % str(self._rec_n_training_fields)
+        netstr += "recommended_num_training_fields=%s" % str(self._default_n_training_fields)
+        netstr += "\nnoise_sigma=%s" % str(self.noise_sigma)
         return netstr
 
     def __repr__(self):
@@ -360,10 +395,11 @@ class HSFANode(mdp.Node):
         in_channel_dim = "in_channel_dim=%s" % str(self.in_channel_dim)
         n_training_fields = "n_training_fields=%s" % str(self.n_training_fields)
         field_dstr = "field_dstr='%s'" % str(self.field_dstr)
+        noise_sigma = "noise_sigma=%s" % str(self.noise_sigma)
         output_dim = "output_dim=%s" % str(self.output_dim)
         dtype = "dtype=%s" % str(self.dtype)
         args = ', '.join((in_channels_xy, field_channels_xy, field_spacing_xy, n_features, in_channel_dim,
-                          n_training_fields, field_dstr, output_dim, dtype))
+                          n_training_fields, field_dstr, noise_sigma, output_dim, dtype))
         return name + '(' + args + ')'
 
     # html representation
@@ -425,6 +461,14 @@ class HSFANode(mdp.Node):
 
     # private container methods
 
+    def _check_train_consistency(self, flow):
+        train_states = mdp.numx.array([node.is_training() for node in flow], dtype='int')
+        # only sequences with trained to training is allowed and not the opposite
+        ts_diff = train_states[1:] - train_states[:-1]
+        if mdp.numx.any(ts_diff < 0):
+            raise mdp.IsNotTrainableException("Inconsistent hierarchy! Found a trainable layer in between two "
+                                              "trained layers.")
+
     def __len__(self):
         return self.n_layers
 
@@ -438,10 +482,14 @@ class HSFANode(mdp.Node):
         execution_flow_copy[key] = value
         # check dimension consistency
         self._execution_flow._check_nodes_consistency(execution_flow_copy)
+        # check train consistency
+        self._check_train_consistency(execution_flow_copy)
         # if no exception was raised, accept the new sequence
         self._execution_flow = mdp.Flow(execution_flow_copy)
         if self.n_training_fields is not None:
             self._training_flow = self._init_random_sampling_net()
+        else:
+            self._training_flow = self._execution_flow
         self._set_args_from_net()
 
     def __iter__(self):
@@ -468,6 +516,8 @@ class HSFANode(mdp.Node):
         self._execution_flow = mdp.Flow(execution_flow_copy)
         if self.n_training_fields is not None:
             self._training_flow = self._init_random_sampling_net()
+        else:
+            self._training_flow = self._execution_flow
         self._set_args_from_net()
 
     # public container methods

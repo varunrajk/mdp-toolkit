@@ -15,11 +15,15 @@ class PG2DNode(mdp.PreserveDimNode):
     as soon as new data is passed through the execute call.
 
     PG2DNode 'subclasses' should take care of overwriting these functions
-    '_setup_plots', '_update_plots'. Check PGCurveNode and PGImageNode as examples.
+    '_setup_plots' - setup your plots, layout, etc.
+    '_update_plots' - data updates to the plots.
+    Check PGCurveNode and PGImageNode as examples and also the examples provided within the PyQtGraph package.
+
     Care must be taken to not overwrite methods '_check_input', '__pg_process', '__pg_data' and
-    '__plot' in a subclass unless really required.
+    '__plot' in a subclass. These are responsible for spawning a parallel plot process.
 
     PG2DNode also works like an identity node returning the input as the output.
+
     When the plotting windows are manually closed, the node continues to transmit input
     as the output without interfering the flow.
     """
@@ -79,9 +83,11 @@ class PG2DNode(mdp.PreserveDimNode):
     # properties
 
     def get_x_range(self):
+        """Returns the range for x axis."""
         return self._x_range
 
     def set_x_range(self, x_range):
+        """Sets the range for x axis."""
         if x_range is None:
             return
         if (not isinstance(x_range, tuple)) and (not isinstance(x_range, list)):
@@ -93,9 +99,11 @@ class PG2DNode(mdp.PreserveDimNode):
     x_range = property(get_x_range, set_x_range, doc="x-axis range")
 
     def get_y_range(self):
+        """Returns the range for y axis."""
         return self._y_range
 
     def set_y_range(self, y_range):
+        """Sets the range for y axis."""
         if y_range is None:
             return
         if (not isinstance(y_range, tuple)) and (not isinstance(y_range, list)):
@@ -108,10 +116,14 @@ class PG2DNode(mdp.PreserveDimNode):
 
     @staticmethod
     def _get_pglut(lutname=None):
+        """Colorspace look up table (requires Matplotlib)"""
         pg_lut = None
         if lutname is not None:
-            from matplotlib.cm import get_cmap
-            from matplotlib.colors import ColorConverter
+            try:
+                from matplotlib.cm import get_cmap
+                from matplotlib.colors import ColorConverter
+            except ImportError:
+                return None
             lut = []
             cmap = get_cmap(lutname, 1000)
             for i in range(1000):
@@ -195,6 +207,7 @@ class PG2DNode(mdp.PreserveDimNode):
         _flow_dur = time.time() - self._flow_time
         y = x
         if self.use_buffer:
+            self._buffer.train(x)
             y = self._buffer(x)
         if self._tlen % int(self._interval) == 0:
             t = time.time()
@@ -301,7 +314,7 @@ class PGCurveNode(PG2DNode):
 
 
 class PGImageNode(PG2DNode):
-    """ PGImageNode is a PG2DNode that displays the input data as an Image."""
+    """ PGImageNode is a PG2DNode that displays the input data as images."""
 
     def __init__(self, img_shapes, display_dims=None, plot_titles=None, cmap=None, origin='upper',
                  axis_order='row-major', interval=1, timeout=0, window_title=None, window_size_xy=(640, 480),
@@ -408,7 +421,7 @@ class PGImageNode(PG2DNode):
     def _setup_plots(self):
         layout = pg.GraphicsLayout()
         plot_items = []
-        plot_objects = {'imgs':[]}
+        plot_objects = {'imgs': []}
 
         num_rows = mdp.numx.ceil(mdp.numx.sqrt(self._n_plots))
         for i in xrange(self._n_plots):

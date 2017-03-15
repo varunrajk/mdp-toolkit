@@ -1,7 +1,7 @@
 import mdp
 from mdp.utils import mult
 import itertools
-from .grid_processing_nodes import GridProcessingNode
+from misc_nodes import GridProcessingNode
 
 
 class BasisFunctionNode(mdp.Node):
@@ -16,8 +16,8 @@ class BasisFunctionNode(mdp.Node):
     'indicator', 'fourier', 'polynomial', 'radial',
     'lem' (laplacian eigen maps), 'gsfa' (graph-based slow features).
 
-    The node also provides a utility method:
-    'get_fn_responses_img' returns an image of basis function responses
+    The node also provides a utility method called 'get_fn_responses_img' that
+    returns an image of the basis function responses
     for uniformly selected inputs within the given lims. This is
     useful for visualizing the functions and debugging.
 
@@ -276,22 +276,6 @@ class BasisFunctionNode(mdp.Node):
         return self._refcast(_fn(self._gp(x)) * self.scale_out)
 
     @staticmethod
-    def _matplotlib_fig_arr(fig):
-        """
-        @brief Convert a Matplotlib figure to a 3D numpy array with RGB channels and return it
-        @param fig a matplotlib figure
-        @return a numpy 3D array of RGB values
-        """
-        from matplotlib.backends.backend_agg import FigureCanvasAgg
-        canvas = FigureCanvasAgg(fig)
-        canvas.draw()
-        w, h = canvas.get_width_height()
-        buf = mdp.numx.fromstring(canvas.tostring_rgb(), dtype='uint8')
-        buf.shape = (h, w, 3)
-
-        return buf
-
-    @staticmethod
     def _scale_to_unit_interval(ndar, eps=1e-8):
         """ Scales all values in the ndarray ndar to be between 0 and 1 """
         ndar = ndar.copy()
@@ -403,10 +387,32 @@ class BasisFunctionNode(mdp.Node):
                         tile_col * (w + ws):tile_col * (w + ws) + w] = this_img * (255 if output_pixel_vals else 1)
             return out_array
 
+    @staticmethod
+    def _matplotlib_fig_arr(fig):
+        """
+        Convert a Matplotlib figure to a 3D numpy array with RGB channels and return it.
+        fig - a matplotlib figure
+        """
+        try:
+            from matplotlib.backends.backend_agg import FigureCanvasAgg
+        except ImportError:
+            return None
+
+        canvas = FigureCanvasAgg(fig)
+        canvas.draw()
+        w, h = canvas.get_width_height()
+        buf = mdp.numx.fromstring(canvas.tostring_rgb(), dtype='uint8')
+        buf.shape = (h, w, 3)
+
+        return buf
+
     def get_fn_responses_img(self):
         """returns an image of features sampled from the environment"""
         if self.input_dim == 1:
-            from matplotlib import pyplot as plt
+            try:
+                from matplotlib import pyplot as plt
+            except ImportError:
+                return None
 
             if self._basis_mode == 'discrete':
                 x = mdp.numx.atleast_2d(mdp.numx.arange(self.lims[0, 0], self.lims[1, 0])).T

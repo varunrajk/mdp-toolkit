@@ -14,7 +14,7 @@ from .misc_nodes import (IdentityNode, HitParadeNode, TimeFramesNode,
                         TimeDelayNode, TimeDelaySlidingWindowNode,
                         EtaComputerNode, NoiseNode, NormalNoiseNode,
                         CutoffNode, HistogramNode, AdaptiveCutoffNode, NumxBufferNode,
-                         TransformerNode)
+                         TransformerNode, GridProcessingNode)
 from .isfa_nodes import ISFANode
 from .rbm_nodes import RBMNode, RBMWithLabelsNode
 from .regression_nodes import LinearRegressionNode
@@ -40,7 +40,6 @@ from .hsfa_nodes import HSFANode, HSFAPoolNode
 from .explorer_nodes import (DiscreteExplorerNode, ContinuousExplorerNode, EpsilonGreedyDiscreteExplorerNode,
                              EpsilonGreedyContinuousExplorerNode, BoltzmannDiscreteExplorerNode, GaussianContinuousExplorereNode,
                              )
-from .grid_processing_nodes import GridProcessingNode
 from .basis_function_nodes import BasisFunctionNode
 
 from .q_rl_nodes import (QRLNode, QLambdaRLNode)
@@ -138,7 +137,6 @@ utils.fixup_namespace(__name__, __all__ + ['ICANode'],
                        'explorer_nodes',
                        'openai_gym_nodes',
                        'basis_function_nodes',
-                       'grid_processing_nodes',
                        'q_rl_nodes',
                        'actor_critic_rl_nodes'
                         ))
